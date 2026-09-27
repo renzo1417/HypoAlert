@@ -16,7 +16,7 @@
 2. **Companion Phone (Light Family Dashboard)**:  
    Provides parents and caregivers with a light, non-alarmist family dashboard organized into **4 dedicated screens** with bottom tab navigation, emergency SMS dispatch via **Huawei Cloud SMN**, overnight trend curves, and real-time vital streams.
 3. **Dynamic Device Router**:  
-   The application entry point automatically identifies whether the host hardware is a **Phone** or a **Wearable** (with display aspect ratio fallbacks for DevEco Studio previewers), routing to the appropriate interface seamlessly.
+   The application entry point automatically identifies whether the host hardware is a **Phone** (`Mate 70 Pro`) or a **Wearable** (`Huawei_Wearable`), routing to the appropriate interface seamlessly.
 
 ---
 
@@ -148,23 +148,51 @@ In DevEco Studio:
 
 ---
 
-### 5. Running & Previewing
+### 5. Running on Local Emulators (API 21)
 
-#### Option A: DevEco Studio Real-Time Previewer (No Device Required)
-- **Phone UI**:
-  - Open `entry/src/main/ets/phone/PhonePage.ets` or `entry/src/main/ets/pages/Phone.ets`.
-  - Open the **Previewer** panel (on the right toolbar).
-  - Select device profile: **Phone** (e.g. 411 × 841).
-  - Switch between the 4 bottom tabs (**Monitor**, **Trends**, **Family**, **Demo**) and test the scenario buttons.
-- **Watch UI**:
-  - Open `entry/src/main/ets/watch/WatchPage.ets`.
-  - Open the **Previewer** panel.
-  - Select device profile: **Wearable** (e.g. 466 × 466).
+HypoAlert is built and tested against **HarmonyOS 6.0.1 (API 21)** local emulators for both Phone and Wearable form factors.
 
-#### Option B: Running on Emulators or Hardware Devices
-1. In the target device selector in DevEco Studio, choose either a **Phone Emulator** or a **Wearable Emulator**.
+#### A. Setting Up Local Emulators in DevEco Studio
+
+1. In DevEco Studio, navigate to **Tools > Device Manager**.
+2. Select the **Local Emulator** tab.
+3. If not already configured, click **New Emulator** to create each target:
+   - **For Phone (Mate 70 Pro)**:
+     - Category: **Phone**
+     - Device Model: **Mate 70 Pro** (1316 × 2832, 560 dpi)
+     - System Image: Download and select **HarmonyOS 6.0.1 (API 21)** (`phone_all_x86`)
+     - Complete the wizard with default memory (4096 MB RAM) and storage.
+   - **For Watch (Huawei_Wearable)**:
+     - Category: **Wearable**
+     - Device Model: **Huawei_Wearable** (466 × 466, 320 dpi)
+     - System Image: Download and select **HarmonyOS 6.0.1 (API 21)** (`wearable_ov_x86`)
+     - Complete the wizard with default configuration.
+
+#### B. Launching the Local Emulators
+
+- **From DevEco Studio GUI**:
+  In **Device Manager > Local Emulator**, click the green **Start (▶)** button next to:
+  - `Mate 70 Pro` (to test the phone companion app)
+  - `Huawei_Wearable` (to test the smartwatch guardian app)
+- **Or From Terminal (CLI)**:
+  ```powershell
+  # Launch Mate 70 Pro Phone Emulator (API 21)
+  & "D:\Huawei\DevEco Studio\tools\emulator\Emulator.exe" -hvd "Mate 70 Pro"
+
+  # Launch Huawei_Wearable Watch Emulator (API 21)
+  & "D:\Huawei\DevEco Studio\tools\emulator\Emulator.exe" -hvd "Huawei_Wearable"
+  ```
+
+#### C. Deploying & Running HypoAlert
+
+1. In DevEco Studio's top toolbar, open the **Target Device** dropdown and select the running emulator:
+   - Select **Mate 70 Pro** to run the family dashboard.
+   - Select **Huawei_Wearable** to run the wearable night guardian.
 2. Click **Run (`Shift + F10`)**.
-3. The device router (`Index.ets`) will automatically detect the device type and launch the corresponding experience.
+3. **Automatic Hardware Detection**:
+   The application entry point (`Index.ets`) queries `deviceInfo.deviceType` at runtime:
+   - On the **Mate 70 Pro**, it launches `PhonePage` with the 4-screen bottom navigation bar (**Monitor**, **Trends**, **Family**, **Demo**).
+   - On the **Huawei_Wearable**, it launches `WatchPage` with the 466×466 circular vital monitor and local haptic alert system.
 
 ---
 
