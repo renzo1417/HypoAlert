@@ -1,14 +1,61 @@
-/node_modules
-/oh_modules
-/local.properties
-/.idea
-**/build
-/.hvigor
-.cxx
-/.clangd
-/.clang-format
-/.clang-tidy
-**/.test
-/.appanalyzer
+# DevEco Studio / IDE
+.idea/
+*.iml
+.vscode/
+
+# Local configuration & environment
+local.properties
+**/local.properties
+
+# Build outputs & caches
+**/build/
+build/
 .preview/
+**/.preview/
+.hvigor/
+**/.hvigor/
+.appanalyzer/
+**/.appanalyzer/
+
+# Package manager dependencies
+node_modules/
+**/node_modules/
+oh_modules/
+**/oh_modules/
+
+# HarmonyOS binaries & packages
+*.hap
+*.har
+*.hsp
+*.app
 *.hmp
+
+# Logs
+*.log
+build.log
+
+# C/C++ native builds
+.cxx/
+**/.cxx/
+.clangd/
+.clang-format
+.clang-tidy
+
+# Test outputs
+.test/
+**/.test/
+coverage/
+
+# Keystores & Signing Certificates (sensitive)
+*.p12
+*.cer
+*.p7b
+*.csr
+*.jks
+*.keystore
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
