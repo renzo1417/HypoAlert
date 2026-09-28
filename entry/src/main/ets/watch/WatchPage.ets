@@ -5,9 +5,11 @@
 
 import { AlertState, VitalsData, VitalsEngine } from '../models/VitalsModel';
 import { AlertService } from '../services/AlertService';
+import { DeviceConnectionManager, ConnectionState, ConnectionListener } from '../services/DeviceConnectionManager';
 import { formatHM } from '../common/utils/TimeUtils';
 import { parseTimeToDate } from './utils/WatchUtils';
 import { WatchMonitorView } from './components/WatchMonitorView';
+import { WatchHistoryView } from './components/WatchHistoryView';
 import { WatchSettingsView } from './components/WatchSettingsView';
 import { WatchTimeEditView } from './components/WatchTimeEditView';
 import { WatchAlertView } from './components/WatchAlertView';
@@ -16,6 +18,7 @@ import { WatchAlertView } from './components/WatchAlertView';
 export struct WatchPage {
   @State currentAlertState: AlertState = AlertState.MONITORING;
   @State isMonitoringActive: boolean = false;
+  @State isPhoneConnected: boolean = true;
   @State currentPage: number = 0;
   @State vitals: VitalsData = {
     pulse: 62,
@@ -41,10 +44,18 @@ export struct WatchPage {
   private vitalsTimerId: number = -1;
   private animTimerId: number = -1;
   private alertService: AlertService = AlertService.getInstance();
+  private connManager: DeviceConnectionManager = DeviceConnectionManager.getInstance();
+  private connListener: ConnectionListener | null = null;
   private swiperCtl: SwiperController = new SwiperController();
 
   aboutToAppear(): void {
     this.vitals = VitalsEngine.generateNormalVitals();
+    this.isPhoneConnected = this.connManager.isConnected();
+    this.connListener = (state: ConnectionState) => {
+      this.isPhoneConnected = state.isConnected;
+    };
+    this.connManager.addListener(this.connListener);
+
     this.alertService.setStatusListener((active: boolean, msg: string) => {
       this.simStatus = msg;
       this.hapticStatus = active ? 'Haptic: alerting' : 'Haptic: idle';
@@ -75,6 +86,10 @@ export struct WatchPage {
   }
 
   aboutToDisappear(): void {
+    if (this.connListener) {
+      this.connManager.removeListener(this.connListener);
+      this.connListener = null;
+    }
     if (this.vitalsTimerId !== -1) {
       clearInterval(this.vitalsTimerId);
       this.vitalsTimerId = -1;
@@ -192,6 +207,7 @@ export struct WatchPage {
         Swiper(this.swiperCtl) {
           WatchMonitorView({
             isMonitoringActive: this.isMonitoringActive,
+            isPhoneConnected: this.isPhoneConnected,
             vitals: this.vitals,
             ringScale: this.ringScale,
             ringOpacity: this.ringOpacity,
@@ -206,9 +222,17 @@ export struct WatchPage {
             }
           })
 
+          WatchHistoryView({
+            currentPage: this.currentPage,
+            onGoToPage: (index: number) => {
+              this.goToPage(index);
+            }
+          })
+
           WatchSettingsView({
             testToolsOpen: $testToolsOpen,
             autoScheduleEnabled: $autoScheduleEnabled,
+            isPhoneConnected: this.isPhoneConnected,
             scheduleStartTime: this.scheduleStartTime,
             scheduleEndTime: this.scheduleEndTime,
             currentPage: this.currentPage,
@@ -223,6 +247,9 @@ export struct WatchPage {
             },
             onOpenTimeEdit: (isStart: boolean) => {
               this.openTimeEdit(isStart);
+            },
+            onTogglePhoneConnection: () => {
+              this.connManager.toggleConnection();
             }
           })
         }

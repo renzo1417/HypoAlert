@@ -20,7 +20,7 @@ export struct WatchAlertView {
     Column() {
       Column({ space: 3 }) {
         Text('CRITICAL ALERT')
-          .fontSize(14)
+          .fontSize(13)
           .fontWeight(FontWeight.Bolder)
           .fontColor('#FFFFFF')
           .maxLines(1)
@@ -29,24 +29,57 @@ export struct WatchAlertView {
           .width('100%')
 
         Text(`${this.vitals.glucose.toFixed(1)} mmol/L`)
-          .fontSize(22)
+          .fontSize(20)
           .fontWeight(FontWeight.Bolder)
           .fontColor('#FFFFFF')
           .textAlign(TextAlign.Center)
           .width('100%')
 
-        Text('< 3.9 mmol/L detected')
-          .fontSize(10)
+        Text('Hypoglycemia detected')
+          .fontSize(9)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-          .opacity(0.95)
+          .fontColor('#FFE5E5')
           .textAlign(TextAlign.Center)
           .width('100%')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
+        // Emergency Dispatch Banner (Calls & Messages sent)
+        Column({ space: 2 }) {
+          Row({ space: 3 }) {
+            Text('📩')
+              .fontSize(9)
+            Text('SMS: Maria (+63 917...)')
+              .fontSize(8)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FFFFFF')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+
+          Row({ space: 3 }) {
+            Text('📞')
+              .fontSize(9)
+            Text('Calling Caregiver...')
+              .fontSize(8)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FFFFFF')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+        }
+        .width('100%')
+        .padding(4)
+        .backgroundColor('rgba(0, 0, 0, 0.28)')
+        .borderRadius(6)
+        .margin({ top: 2, bottom: 2 })
+
         Text(`${this.vitals.pulse} BPM | ${this.vitals.skinTemp.toFixed(1)}°C`)
-          .fontSize(10)
+          .fontSize(9)
           .fontColor('#FFCDD2')
           .textAlign(TextAlign.Center)
           .width('100%')
@@ -55,29 +88,29 @@ export struct WatchAlertView {
 
         Button("I'M AWAKE")
           .width('100%')
-          .height(44)
+          .height(38)
           .backgroundColor('#FFFFFF')
           .fontColor('#C00F1A')
-          .fontSize(12)
+          .fontSize(11)
           .fontWeight(FontWeight.Bolder)
-          .borderRadius(24)
-          .margin({ top: 6 })
+          .borderRadius(20)
+          .margin({ top: 4 })
           .onClick(() => {
             this.onDismiss();
           })
 
-        Text('Tap to stop alarms')
-          .fontSize(9)
+        Text('Tap to stop alarms & sirens')
+          .fontSize(8)
           .fontColor('#FFCDD2')
           .textAlign(TextAlign.Center)
           .width('100%')
       }
-      .width(180)
+      .width(184)
       .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .height('100%')
-    .padding({ top: 32, bottom: 32 })
+    .padding({ top: 24, bottom: 24 })
     .alignItems(HorizontalAlign.Center)
     .justifyContent(FlexAlign.Center)
     .backgroundColor('#EE1C25')

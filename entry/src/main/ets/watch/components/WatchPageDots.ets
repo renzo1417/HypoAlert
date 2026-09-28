@@ -1,38 +1,51 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Wearable — Pagination dots for swiping between Monitor and Settings.
+ * Wearable — Pagination dots for swiping between Monitor, History, and Settings.
  */
 
 @Component
 export struct WatchPageDots {
   @Prop currentPage: number = 0;
+  @Prop totalPages: number = 3;
   onSelectPage: (page: number) => void = () => {};
 
   build() {
-    Row({ space: 2 }) {
+    Row({ space: 4 }) {
       Button() {
-        Circle({ width: 6, height: 6 })
-          .fill(this.currentPage === 0 ? '#FFFFFF' : '#4A4F57')
+        Circle({ width: this.currentPage === 0 ? 7 : 5, height: this.currentPage === 0 ? 7 : 5 })
+          .fill(this.currentPage === 0 ? '#00E5FF' : '#4A4F57')
       }
-      .width(26)
-      .height(26)
+      .width(20)
+      .height(20)
       .backgroundColor(Color.Transparent)
       .onClick(() => {
         this.onSelectPage(0);
       })
 
       Button() {
-        Circle({ width: 6, height: 6 })
-          .fill(this.currentPage === 1 ? '#FFFFFF' : '#4A4F57')
+        Circle({ width: this.currentPage === 1 ? 7 : 5, height: this.currentPage === 1 ? 7 : 5 })
+          .fill(this.currentPage === 1 ? '#00E5FF' : '#4A4F57')
       }
-      .width(26)
-      .height(22)
+      .width(20)
+      .height(20)
       .backgroundColor(Color.Transparent)
       .onClick(() => {
         this.onSelectPage(1);
       })
+
+      Button() {
+        Circle({ width: this.currentPage === 2 ? 7 : 5, height: this.currentPage === 2 ? 7 : 5 })
+          .fill(this.currentPage === 2 ? '#00E5FF' : '#4A4F57')
+      }
+      .width(20)
+      .height(20)
+      .backgroundColor(Color.Transparent)
+      .onClick(() => {
+        this.onSelectPage(2);
+      })
     }
     .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
   }
 }
 

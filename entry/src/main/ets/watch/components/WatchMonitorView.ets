@@ -22,6 +22,7 @@ export struct WatchMonitorView {
   @Prop simStatus: string = 'Standby - tap START';
   @Prop hapticStatus: string = 'Haptic: idle';
   @Prop currentPage: number = 0;
+  @Prop isPhoneConnected: boolean = true;
   onToggleMonitoring: () => void = () => {};
   onSelectPage: (page: number) => void = () => {};
 
@@ -29,15 +30,19 @@ export struct WatchMonitorView {
     Column() {
       Column({ space: 3 }) {
         Row() {
-          Text('HYPOALERT')
-            .fontSize(9)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.isMonitoringActive ? '#00E5FF' : '#8A8F98')
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .layoutWeight(1)
-            .textAlign(TextAlign.Start)
-            .margin({ left: 15 })
+          Row({ space: 4 }) {
+            Circle({ width: 5, height: 5 })
+              .fill(this.isPhoneConnected ? '#00E676' : '#5B616B')
+            Text('HYPOALERT')
+              .fontSize(9)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.isMonitoringActive ? '#00E5FF' : '#8A8F98')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .layoutWeight(1)
+          .alignItems(VerticalAlign.Center)
+          .margin({ left: 15 })
 
           Text(format12H(this.vitals.timestamp))
             .fontSize(9)
@@ -154,6 +159,7 @@ export struct WatchMonitorView {
 
         WatchPageDots({
           currentPage: this.currentPage,
+          totalPages: 3,
           onSelectPage: this.onSelectPage
         })
       }

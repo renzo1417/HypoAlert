@@ -10,6 +10,7 @@ import { WatchPageDots } from './WatchPageDots';
 export struct WatchSettingsView {
   @Link testToolsOpen: boolean;
   @Link autoScheduleEnabled: boolean;
+  @Prop isPhoneConnected: boolean = true;
   @Prop scheduleStartTime: string = '22:00';
   @Prop scheduleEndTime: string = '06:00';
   @Prop currentPage: number = 1;
@@ -17,10 +18,11 @@ export struct WatchSettingsView {
   onDropStep: () => void = () => {};
   onTriggerCrisis: () => void = () => {};
   onOpenTimeEdit: (isStart: boolean) => void = () => {};
+  onTogglePhoneConnection: () => void = () => {};
 
   build() {
-    Column() {
-      Column({ space: 3 }) {
+    Scroll() {
+      Column({ space: 4 }) {
         Row() {
           Button('Back')
             .fontSize(9)
@@ -48,6 +50,37 @@ export struct WatchSettingsView {
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)
+
+        // Phone connection card (Demo)
+        Column({ space: 2 }) {
+          Row() {
+            Row({ space: 4 }) {
+              Circle({ width: 6, height: 6 })
+                .fill(this.isPhoneConnected ? '#00E676' : '#5B616B')
+              Text(this.isPhoneConnected ? 'Phone linked' : 'Phone offline')
+                .fontSize(9)
+                .fontColor(this.isPhoneConnected ? '#E8EBEF' : '#8A8F98')
+            }
+            .layoutWeight(1)
+
+            Button(this.isPhoneConnected ? 'Unlink' : 'Link')
+              .fontSize(9)
+              .height(22)
+              .padding({ left: 8, right: 8 })
+              .backgroundColor(this.isPhoneConnected ? '#232A34' : '#00A9CE')
+              .fontColor(this.isPhoneConnected ? '#C7CCD4' : '#FFFFFF')
+              .borderRadius(11)
+              .onClick(() => {
+                this.onTogglePhoneConnection();
+              })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+        }
+        .width('100%')
+        .padding({ top: 4, bottom: 4, left: 8, right: 8 })
+        .backgroundColor('#14181F')
+        .borderRadius(12)
 
         // Test tools demo dropdown: "+" collapsed, "–" expanded.
         Column({ space: 3 }) {
@@ -109,20 +142,25 @@ export struct WatchSettingsView {
         .backgroundColor('#14181F')
         .borderRadius(12)
 
-        // Sleep schedule card.
+        // Night Guardian Feature Activation Card
         Column({ space: 3 }) {
           Row() {
-            Text('Sleep schedule')
-              .fontSize(10)
-              .fontColor('#E8EBEF')
-              .layoutWeight(1)
-              .textAlign(TextAlign.Center)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Column({ space: 1 }) {
+              Text('Night Guardian')
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#FFFFFF')
+                .textAlign(TextAlign.Start)
+              Text(this.autoScheduleEnabled ? 'Monitoring Active' : 'Paused')
+                .fontSize(8)
+                .fontColor(this.autoScheduleEnabled ? '#00E676' : '#8A8F98')
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
 
             Toggle({ type: ToggleType.Switch, isOn: this.autoScheduleEnabled })
-              .selectedColor('#FFFFFF')
-              .switchPointColor('#000000')
+              .selectedColor('#00E5FF')
+              .switchPointColor('#FFFFFF')
               .width(34)
               .height(20)
               .onChange((isOn: boolean) => {
@@ -132,18 +170,20 @@ export struct WatchSettingsView {
           .width('100%')
           .alignItems(VerticalAlign.Center)
 
+          Divider().color('#232A34').strokeWidth(1).margin({ top: 2, bottom: 2 })
+
           Row() {
             Column({ space: 1 }) {
-              Text('On')
-                .fontSize(9)
+              Text('Bedtime Schedule')
+                .fontSize(8)
                 .fontColor('#5B616B')
                 .textAlign(TextAlign.Start)
                 .width('100%')
 
-              Text(format12H(this.scheduleStartTime))
-                .fontSize(12)
+              Text(`${format12H(this.scheduleStartTime)} - ${format12H(this.scheduleEndTime)}`)
+                .fontSize(10)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#FFFFFF')
+                .fontColor('#C7CCD4')
                 .textAlign(TextAlign.Start)
                 .width('100%')
                 .maxLines(1)
@@ -151,35 +191,13 @@ export struct WatchSettingsView {
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
-            .padding({ top: 4, bottom: 4 })
-            .onClick(() => {
-              this.onOpenTimeEdit(true);
-            })
-
-            Column({ space: 1 }) {
-              Text('Off')
-                .fontSize(9)
-                .fontColor('#5B616B')
-                .textAlign(TextAlign.End)
-                .width('100%')
-
-              Text(format12H(this.scheduleEndTime))
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#FFFFFF')
-                .textAlign(TextAlign.End)
-                .width('100%')
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.End)
-            .padding({ top: 4, bottom: 4 })
-            .onClick(() => {
-              this.onOpenTimeEdit(false);
-            })
           }
           .width('100%')
+
+          Text('Configured via Phone Companion')
+            .fontSize(7)
+            .fontColor('#6E747D')
+            .width('100%')
         }
         .width('100%')
         .padding({ top: 6, bottom: 6, left: 8, right: 8 })
@@ -187,21 +205,23 @@ export struct WatchSettingsView {
         .borderRadius(12)
 
         // Spacer to lift dots onto matching alignment
-        Blank().height(24)
+        Blank().height(10)
 
         WatchPageDots({
           currentPage: this.currentPage,
+          totalPages: 3,
           onSelectPage: this.onGoToPage
         })
       }
       .width(180)
+      .padding({ top: 28, bottom: 48 })
       .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .height('100%')
-    .padding({ top: 26, bottom: 26 })
-    .alignItems(HorizontalAlign.Center)
-    .justifyContent(FlexAlign.Center)
+    .scrollBar(BarState.Off)
+    .scrollable(ScrollDirection.Vertical)
+    .align(Alignment.Top)
     .backgroundColor('#000000')
   }
 }

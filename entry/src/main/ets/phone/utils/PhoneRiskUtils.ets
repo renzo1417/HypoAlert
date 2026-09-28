@@ -54,65 +54,85 @@ export function riskColor(risk: number): string {
 export function heroSentence(riskIndex: number): string {
   const lvl: string = riskLevel(riskIndex);
   if (lvl === 'Critical') {
-    return 'Emergency — help alerted';
+    return 'Critical emergency — urgent help alerted';
   }
   if (lvl === 'Warning') {
-    return 'Dropping — check on them';
+    return 'Glucose dropping — check on them';
   }
-  return 'Steady all night';
+  return 'All vitals steady throughout the night';
 }
 
 export function trendWord(riskIndex: number): string {
   const lvl: string = riskLevel(riskIndex);
   if (lvl === 'Critical') {
-    return 'Very low — help now';
+    return 'Dropping fast';
   }
   if (lvl === 'Warning') {
-    return 'Going down';
+    return 'Trending down';
   }
-  return 'Steady';
+  return 'Stable';
 }
 
 export function heartSub(riskIndex: number): string {
   const lvl: string = riskLevel(riskIndex);
   if (lvl === 'Critical') {
-    return 'very fast — urgent';
+    return 'Elevated — urgent';
   }
   if (lvl === 'Warning') {
-    return 'a bit fast — watching';
+    return 'Slightly fast';
   }
-  return 'resting — calm';
+  return 'Resting normal';
 }
 
 export function heartWords(riskIndex: number, heartRate: number): string {
   const lvl: string = riskLevel(riskIndex);
   if (lvl === 'Critical') {
-    return `Heart rate ${heartRate} — very fast`;
+    return `Rapid pulse • ${heartRate} bpm`;
   }
   if (lvl === 'Warning') {
-    return `Heart rate ${heartRate} — a bit fast`;
+    return `Elevated pulse • ${heartRate} bpm`;
   }
-  return `Heart rate ${heartRate} — resting`;
+  return `Resting pulse • ${heartRate} bpm`;
 }
 
 export function restlessShort(tremorPSD: number): string {
   if (tremorPSD > 1.2) {
-    return 'High';
+    return 'Restless';
   }
   if (tremorPSD > 0.5) {
-    return 'Rising';
+    return 'Active';
   }
   return 'Calm';
 }
 
 export function restlessHint(tremorPSD: number): string {
   if (tremorPSD > 1.2) {
-    return 'Moving a lot — check now';
+    return 'Frequent nocturnal movement';
   }
   if (tremorPSD > 0.5) {
-    return 'Moving more — keep watch';
+    return 'Minor position shifts';
   }
-  return 'Sleeping calmly';
+  return 'Restful, peaceful sleep';
+}
+
+export function tempStatus(skinTemp: number): string {
+  if (skinTemp < 35.2) {
+    return 'Cooling & clammy';
+  }
+  if (skinTemp < 35.8) {
+    return 'Slightly cool';
+  }
+  return 'Normal warmth';
+}
+
+export function tempColor(skinTemp: number): string {
+  if (skinTemp < 35.2) {
+    return '#FF3B30';
+  }
+  if (skinTemp < 35.8) {
+    return '#FF9500';
+  }
+  return '#34C759';
 }
 
 export function computeTremorBands(tremorPSD: number): TremorBand[] {

@@ -1,175 +1,120 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Caregiver contact management, emergency dispatch toggle, and audit log.
+ * Phone Companion — Minimalist Caregiver Quick-Contact Card.
+ * Modeled after the primary contact/physician card in modern health apps.
  */
-
-import { AuditEntry } from '../models/PhoneTypes';
 
 @Component
 export struct PhoneCaregiverCard {
-  @Link caregiverName: string;
-  @Link caregiverPhone: string;
-  @Link smnEnabled: boolean;
-  @Prop auditLog: AuditEntry[] = [];
-  onCallNow: () => void = () => {};
-  onToggleSmn: (isOn: boolean) => void = () => {};
+  @Prop caregiverName: string = 'Maria Santos';
+  @Prop caregiverRole: string = 'Primary Caregiver';
+  @Prop caregiverPhone: string = '+63 917 123 4567';
+  @Prop isEmergency: boolean = false;
+  onCall: () => void = () => {};
+  onMessage: () => void = () => {};
 
   build() {
-    Column({ space: 12 }) {
-      Row({ space: 8 }) {
-        Text('Caregiver')
-          .fontSize(16)
+    Row({ space: 12 }) {
+      // Caregiver Avatar / Status Indicator
+      Stack({ alignContent: Alignment.Center }) {
+        Circle({ width: 46, height: 46 })
+          .fill(this.isEmergency ? '#FEE2E2' : '#E0E7FF')
+
+        // Stylized initials or caregiver symbol
+        Text(this.caregiverName.length > 0 ? this.caregiverName.substring(0, 1) : 'C')
+          .fontSize(18)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#0F1B2D')
-          .layoutWeight(1)
-
-        Circle({ width: 9, height: 9 })
-          .fill('#F6B8C1')
-        Text('family')
-          .fontSize(12)
-          .fontColor('#8A94A6')
+          .fontColor(this.isEmergency ? '#EF4444' : '#4338CA')
       }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
+      .width(46)
+      .height(46)
 
-      Button('Call now')
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .height(56)
-        .width('100%')
-        .backgroundColor('#2E86DE')
-        .fontColor('#FFFFFF')
-        .borderRadius(16)
+      // Name & Role Details
+      Column({ space: 2 }) {
+        Text(this.caregiverName)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#111827')
+
+        Row({ space: 6 }) {
+          Circle({ width: 6, height: 6 })
+            .fill(this.isEmergency ? '#EF4444' : '#22C55E')
+          Text(this.isEmergency ? 'Urgent Alert Sent' : `${this.caregiverRole} • Ready`)
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.isEmergency ? '#EF4444' : '#64748B')
+        }
+        .alignItems(VerticalAlign.Center)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+
+      // Action Buttons (Message & Call)
+      Row({ space: 8 }) {
+        // Message / Notification button
+        Button() {
+          Stack({ alignContent: Alignment.Center }) {
+            // Chat bubble glyph
+            Column({ space: 2 }) {
+              Row()
+                .width(16)
+                .height(11)
+                .backgroundColor(this.isEmergency ? '#EF4444' : '#475569')
+                .borderRadius(3)
+              Row()
+                .width(6)
+                .height(3)
+                .backgroundColor(this.isEmergency ? '#EF4444' : '#475569')
+                .borderRadius(1)
+                .margin({ left: 3 })
+            }
+            .alignItems(HorizontalAlign.Start)
+          }
+          .width(40)
+          .height(40)
+        }
+        .width(40)
+        .height(40)
+        .backgroundColor('#FFFFFF')
+        .borderRadius(12)
+        .shadow({ radius: 6, color: 'rgba(0, 0, 0, 0.05)', offsetY: 2 })
         .onClick(() => {
-          this.onCallNow();
+          this.onMessage();
         })
 
-      Column({ space: 4 }) {
-        Text('Contact name')
-          .fontSize(13)
-          .fontColor('#8A94A6')
-          .width('100%')
-        TextInput({ text: this.caregiverName, placeholder: 'Family member name' })
-          .width('100%')
-          .height(48)
-          .fontSize(14)
-          .fontColor('#0F1B2D')
-          .backgroundColor('#F1F5FA')
-          .placeholderColor('#8A94A6')
-          .border({ width: 1, color: '#E0E7F0', radius: 12 })
-          .onChange((value: string) => {
-            this.caregiverName = value;
-          })
-      }
-      .width('100%')
-
-      Column({ space: 4 }) {
-        Text('Phone number')
-          .fontSize(13)
-          .fontColor('#8A94A6')
-          .width('100%')
-        TextInput({ text: this.caregiverPhone, placeholder: '+63 ...' })
-          .width('100%')
-          .height(48)
-          .fontSize(14)
-          .fontColor('#0F1B2D')
-          .backgroundColor('#F1F5FA')
-          .placeholderColor('#8A94A6')
-          .border({ width: 1, color: '#E0E7F0', radius: 12 })
-          .onChange((value: string) => {
-            this.caregiverPhone = value;
-          })
-      }
-      .width('100%')
-
-      Row({ space: 10 }) {
-        Column({ space: 2 }) {
-          Text('Text family in emergency')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#0F1B2D')
-          Text('Texts family automatically in emergency')
-            .fontSize(13)
-            .fontColor('#8A94A6')
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        Toggle({ type: ToggleType.Switch, isOn: this.smnEnabled })
-          .width(52)
-          .height(32)
-          .selectedColor('#2E86DE')
-          .switchPointColor('#FFFFFF')
-          .onChange((isOn: boolean) => {
-            this.smnEnabled = isOn;
-            this.onToggleSmn(isOn);
-          })
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .padding({ top: 4, bottom: 4 })
-
-      Divider().color('#E3E9F2').strokeWidth(1)
-
-      Text('Recent updates')
-        .fontSize(13)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#8A94A6')
-        .width('100%')
-
-      Column({ space: 6 }) {
-        ForEach(this.auditLog, (entry: AuditEntry) => {
-          Row({ space: 8 }) {
-            Text(entry.time)
-              .fontSize(13)
-              .fontColor('#8A94A6')
-              .width(44)
-            Text(entry.message)
-              .fontSize(14)
-              .fontColor('#0F1B2D')
-              .layoutWeight(1)
-              .maxLines(2)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
+        // Call button
+        Button() {
+          Stack({ alignContent: Alignment.Center }) {
+            // Phone handset glyph
+            Row() {
+              Circle({ width: 8, height: 8 })
+                .fill(this.isEmergency ? '#FFFFFF' : '#2563EB')
+              Row()
+                .width(5)
+                .height(12)
+                .backgroundColor(this.isEmergency ? '#FFFFFF' : '#2563EB')
+                .borderRadius(2)
+            }
+            .rotate({ angle: -25 })
           }
-          .width('100%')
-          .padding(10)
-          .backgroundColor('#F4F7FB')
-          .borderRadius(10)
-          .alignItems(VerticalAlign.Top)
-        }, (entry: AuditEntry, index: number) => `${index}_${entry.time}_${entry.level}`)
+          .width(40)
+          .height(40)
+        }
+        .width(40)
+        .height(40)
+        .backgroundColor(this.isEmergency ? '#EF4444' : '#FFFFFF')
+        .borderRadius(12)
+        .shadow({ radius: 6, color: 'rgba(0, 0, 0, 0.05)', offsetY: 2 })
+        .onClick(() => {
+          this.onCall();
+        })
       }
-      .width('100%')
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .padding(16)
-    .backgroundColor('#FFFFFF')
-    .borderRadius(22)
-    .border({ width: 1, color: '#E3E9F2', radius: 22 })
-    .shadow({ radius: 14, color: 'rgba(15,27,45,0.08)', offsetX: 0, offsetY: 6 })
-  }
-}
-
-@Preview({ title: 'Phone Caregiver Card' })
-@Component
-struct PhoneCaregiverCardPreview {
-  @State caregiverName: string = 'Maria Santos';
-  @State caregiverPhone: string = '+63 917 123 4567';
-  @State smnEnabled: boolean = true;
-  @State auditLog: AuditEntry[] = [
-    { time: '23:00', message: 'Set up finished — all good', level: 'ok' },
-    { time: '02:15', message: 'Small movement noticed — all okay', level: 'warn' }
-  ];
-
-  build() {
-    Column() {
-      PhoneCaregiverCard({
-        caregiverName: $caregiverName,
-        caregiverPhone: $caregiverPhone,
-        smnEnabled: $smnEnabled,
-        auditLog: this.auditLog
-      })
-    }
-    .padding(16)
-    .backgroundColor('#EEF2F7')
+    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+    .backgroundColor('#EEF2FE')
+    .borderRadius(20)
+    .alignItems(VerticalAlign.Center)
   }
 }

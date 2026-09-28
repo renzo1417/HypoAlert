@@ -1,11 +1,14 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Caregiver dashboard coordinator with bottom navigation tabs.
+ * Phone Companion — Caregiver dashboard coordinator with floating pill navigation.
+ * Redesigned to match the modern, serene health monitoring aesthetic.
  */
 
 import { AlertService } from '../services/AlertService';
+import { DeviceConnectionManager, ConnectionState, ConnectionListener } from '../services/DeviceConnectionManager';
 import { formatLocalTime, formatLogTime } from '../common/utils/TimeUtils';
 import { AuditEntry } from './models/PhoneTypes';
+import { HistoryRepository } from '../models/HistoryModel';
 import { ppgSample, computeRiskIndex, riskLevel } from './utils/PhoneRiskUtils';
 import { PhoneTopBar } from './components/PhoneTopBar';
 import { MonitorView } from './views/MonitorView';
@@ -24,6 +27,8 @@ export struct PhonePage {
   @State tremorPSD: number = 0.12;
   @State riskIndex: number = 12;
   @State watchBattery: number = 86;
+  @State isWatchConnected: boolean = true;
+  @State deviceName: string = 'HUAWEI WATCH 4 Pro';
 
   @State caregiverName: string = 'Maria Santos';
   @State caregiverPhone: string = '+63 917 123 4567';
@@ -31,12 +36,14 @@ export struct PhonePage {
   @State smnLastSent: string = '';
   @State bannerFlash: boolean = false;
   @State auditLog: AuditEntry[] = [
-    { time: '23:00', message: 'Set up finished — all good', level: 'ok' },
-    { time: '02:15', message: 'Small movement noticed — all okay', level: 'warn' },
-    { time: '02:16', message: 'All good', level: 'ok' }
+    { time: '23:00', message: 'Night Guardian calibrated • Normal vitals', level: 'ok' },
+    { time: '02:15', message: 'Minor position shift • Normal', level: 'warn' },
+    { time: '02:16', message: 'Glucose stable at 5.5 mmol/L', level: 'ok' }
   ];
 
   private alertService: AlertService = AlertService.getInstance();
+  private connManager: DeviceConnectionManager = DeviceConnectionManager.getInstance();
+  private connListener: ConnectionListener | null = null;
   private tabsController: TabsController = new TabsController();
   private clockTimerId: number = -1;
   private streamTimerId: number = -1;
@@ -55,13 +62,31 @@ export struct PhonePage {
       this.ppgData.push(ppgSample(i / this.PPG_LEN));
     }
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
+
+    this.isWatchConnected = this.connManager.isConnected();
+    this.deviceName = this.connManager.getState().deviceName;
+    this.watchBattery = this.connManager.getState().batteryLevel;
+    this.connListener = (state: ConnectionState) => {
+      this.isWatchConnected = state.isConnected;
+      this.deviceName = state.deviceName;
+      this.watchBattery = state.batteryLevel;
+      if (!state.isConnected) {
+        this.logEvent('Watch disconnected — stream paused', 'warn');
+      } else {
+        this.logEvent('Watch connected — live stream active', 'ok');
+      }
+    };
+    this.connManager.addListener(this.connListener);
+
     this.clockTimerId = setInterval(() => {
       this.currentTime = formatLocalTime(new Date());
     }, 1000);
     this.streamTimerId = setInterval(() => {
-      this.pushPpgSamples();
-      this.jitterTelemetry();
-      this.drawPPG();
+      if (this.isWatchConnected) {
+        this.pushPpgSamples();
+        this.jitterTelemetry();
+        this.drawPPG();
+      }
     }, 100);
     this.flashTimerId = setInterval(() => {
       this.bannerFlash = !this.bannerFlash;
@@ -69,6 +94,10 @@ export struct PhonePage {
   }
 
   aboutToDisappear(): void {
+    if (this.connListener) {
+      this.connManager.removeListener(this.connListener);
+      this.connListener = null;
+    }
     if (this.clockTimerId !== -1) {
       clearInterval(this.clockTimerId);
       this.clockTimerId = -1;
@@ -120,6 +149,7 @@ export struct PhonePage {
     }
     if (this.watchBattery > 20 && Math.random() < 0.01) {
       this.watchBattery -= 1;
+      this.connManager.setBattery(this.watchBattery);
     }
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
   }
@@ -132,7 +162,7 @@ export struct PhonePage {
     const W: number = 320;
     const H: number = 56;
     ctx.clearRect(0, 0, W, H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 1;
     const gy: number = H / 2;
     ctx.beginPath();
@@ -140,7 +170,7 @@ export struct PhonePage {
     ctx.lineTo(W, gy);
     ctx.stroke();
     ctx.beginPath();
-    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeStyle = '#60A5FA';
     ctx.lineWidth = 2;
     const n: number = this.ppgData.length;
     for (let i: number = 0; i < n; i++) {
@@ -179,7 +209,7 @@ export struct PhonePage {
     this.skinTemp = 36.0;
     this.variability = 42;
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('All good — steady', 'ok');
+    this.logEvent('Stable nocturnal vitals restored', 'ok');
   }
 
   private simulatePreDrop(): void {
@@ -190,7 +220,7 @@ export struct PhonePage {
     this.skinTemp = 35.6;
     this.variability = 26;
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('Going down — keep watching', 'warn');
+    this.logEvent('Glucose trending down (4.2 mmol/L)', 'warn');
   }
 
   private simulateCrisis(): void {
@@ -201,13 +231,14 @@ export struct PhonePage {
     this.variability = 12;
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
     this.alertService.startEmergencyAlert();
-    this.logEvent('Emergency — alarm ringing, family texted', 'crit');
+    this.logEvent('Emergency alert active • Alarm sounding', 'crit');
     if (this.smnEnabled) {
       const t: string = formatLogTime(new Date());
       this.smnLastSent = t;
-      this.logEvent(`Text sent to ${this.caregiverName} (${this.caregiverPhone})`, 'crit');
+      this.logEvent(`SMS dispatched to ${this.caregiverName} (${this.caregiverPhone})`, 'crit');
+      HistoryRepository.updateTonightCrisis(this.glucose, this.riskIndex, this.caregiverName, this.caregiverPhone);
     } else {
-      this.logEvent('Family texts are off — no text sent', 'warn');
+      this.logEvent('SMS dispatch paused by user settings', 'warn');
     }
   }
 
@@ -216,17 +247,27 @@ export struct PhonePage {
     this.glucose = 4.6;
     this.tremorPSD = 0.4;
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('You are with them — alarm stopped', 'ok');
+    this.logEvent('Caregiver confirmed assistance • Alarm silenced', 'ok');
+    HistoryRepository.updateTonightResolved();
   }
 
   private handleCallNow(): void {
     const lvl: string = riskLevel(this.riskIndex);
     if (lvl === 'Critical') {
-      this.logEvent(`You called ${this.caregiverName} — emergency response`, 'crit');
+      this.logEvent(`Direct emergency dial to ${this.caregiverName}`, 'crit');
+      const tonight = HistoryRepository.getHistory()[0];
+      tonight.actionsTaken.unshift({
+        time: 'Just now',
+        type: 'call',
+        title: 'Emergency Phone Call Placed',
+        detail: `Direct phone dial to primary contact ${this.caregiverName}.`,
+        target: `${this.caregiverName} (${this.caregiverPhone})`,
+        status: 'Completed'
+      });
     } else if (lvl === 'Warning') {
-      this.logEvent(`You called ${this.caregiverName} — urgent check`, 'warn');
+      this.logEvent(`Alert check call to ${this.caregiverName}`, 'warn');
     } else {
-      this.logEvent(`You called ${this.caregiverName} — all steady`, 'info');
+      this.logEvent(`Connected with ${this.caregiverName}`, 'info');
     }
   }
 
@@ -251,7 +292,7 @@ export struct PhonePage {
           Text('!')
             .fontSize(16)
             .fontWeight(FontWeight.Bolder)
-            .fontColor('#FF3B30')
+            .fontColor('#EF4444')
         }
         .width(28)
         .height(28)
@@ -262,7 +303,7 @@ export struct PhonePage {
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFFFFF')
           Text('Glucose 3.1 mmol/L • Alarm ringing')
-            .fontSize(12)
+            .fontSize(11)
             .fontColor('#FFFFFF')
         }
         .alignItems(HorizontalAlign.Start)
@@ -271,234 +312,273 @@ export struct PhonePage {
         Button("I'm with them")
           .fontSize(12)
           .fontWeight(FontWeight.Bold)
-          .height(34)
+          .height(32)
           .backgroundColor('#FFFFFF')
-          .fontColor('#FF3B30')
+          .fontColor('#EF4444')
           .borderRadius(10)
           .onClick(() => {
             this.markWithThem();
           })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-      .backgroundColor('#FF3B30')
-      .opacity(this.bannerFlash ? 1.0 : 0.85)
+      .padding({ left: 20, right: 20, top: 8, bottom: 8 })
+      .backgroundColor('#EF4444')
+      .opacity(this.bannerFlash ? 1.0 : 0.88)
     }
   }
 
   @Builder
-  bottomTabItem(index: number, title: string) {
-    Column({ space: 4 }) {
+  floatingTabButton(index: number) {
+    Button() {
       Stack({ alignContent: Alignment.Center }) {
         if (this.currentTabIndex === index) {
-          Row()
-            .width(44)
-            .height(26)
-            .backgroundColor('#E7F0FE')
-            .borderRadius(13)
+          Circle({ width: 42, height: 42 })
+            .fill('#111827')
         }
 
-        // Custom vector shapes for each tab icon
+        // Vector Icon matching reference design
         if (index === 0) {
-          // Monitor: Vital pulse wave
-          Row({ space: 3 }) {
-            Circle({ width: 4, height: 4 })
-              .fill(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
+          // Tab 0: Home / Monitor
+          Column({ space: 1 }) {
             Row()
-              .width(5)
-              .height(14)
-              .backgroundColor(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
-              .borderRadius(2.5)
-            Circle({ width: 4, height: 4 })
-              .fill(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
-          }
-          .alignItems(VerticalAlign.Center)
-        } else if (index === 1) {
-          // Trends: 3-bar histogram
-          Row({ space: 3 }) {
+              .width(12)
+              .height(6)
+              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+              .borderRadius({ topLeft: 6, topRight: 6 })
             Row()
-              .width(4)
+              .width(14)
               .height(8)
-              .backgroundColor(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
-              .borderRadius(2)
+              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+              .borderRadius({ bottomLeft: 2, bottomRight: 2 })
+          }
+          .alignItems(HorizontalAlign.Center)
+        } else if (index === 1) {
+          // Tab 1: Trends
+          Row({ space: 2 }) {
             Row()
-              .width(4)
+              .width(3)
+              .height(8)
+              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+              .borderRadius(1.5)
+            Row()
+              .width(3)
               .height(14)
-              .backgroundColor(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
-              .borderRadius(2)
+              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+              .borderRadius(1.5)
             Row()
-              .width(4)
-              .height(11)
-              .backgroundColor(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
-              .borderRadius(2)
+              .width(3)
+              .height(10)
+              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+              .borderRadius(1.5)
           }
           .alignItems(VerticalAlign.Bottom)
         } else if (index === 2) {
-          // Family: Shield badge with blush accent dot
+          // Tab 2: Care Circle / Family (Chat bubble)
           Stack({ alignContent: Alignment.Center }) {
-            Circle({ width: 15, height: 15 })
-              .fill(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
-            Circle({ width: 6, height: 6 })
-              .fill('#F6B8C1')
+            Column({ space: 1 }) {
+              Row()
+                .width(14)
+                .height(10)
+                .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+                .borderRadius(3)
+              Row()
+                .width(5)
+                .height(3)
+                .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
+                .borderRadius(1)
+                .margin({ left: 3 })
+            }
+            .alignItems(HorizontalAlign.Start)
+
+            // Alert dot on Care Circle tab during emergency
+            if (this.isEmergency()) {
+              Circle({ width: 6, height: 6 })
+                .fill('#EF4444')
+                .offset({ x: 8, y: -6 })
+            }
           }
-          .width(16)
-          .height(16)
+          .width(18)
+          .height(18)
         } else {
-          // Demo: Sliders / Lab control
+          // Tab 3: Demo / Tools (Sliders)
           Row({ space: 2 }) {
             Circle({ width: 4, height: 4 })
-              .fill(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
+              .fill(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
             Row()
               .width(8)
               .height(3)
-              .backgroundColor(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
+              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
               .borderRadius(1.5)
             Circle({ width: 4, height: 4 })
-              .fill(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
+              .fill(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
           }
           .alignItems(VerticalAlign.Center)
         }
-
-        // Notification badge on Family tab if emergency
-        if (index === 2 && this.isEmergency()) {
-          Circle({ width: 8, height: 8 })
-            .fill('#FF3B30')
-            .offset({ x: 14, y: -8 })
-        }
       }
-      .width(48)
-      .height(28)
-
-      Text(title)
-        .fontSize(11)
-        .fontWeight(this.currentTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
-        .fontColor(this.currentTabIndex === index ? '#2E86DE' : '#8A94A6')
+      .width(44)
+      .height(44)
     }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
+    .width(44)
+    .height(44)
+    .backgroundColor('transparent')
+    .onClick(() => {
+      this.switchToTab(index);
+    })
   }
 
   build() {
     Column() {
-      // Top Bar (branded header + live clock + connection status)
+      // Top Bar (clean greeting + watch pill + notification bell)
       PhoneTopBar({
         currentTime: this.currentTime,
         isEmergency: this.isEmergency(),
-        watchBattery: this.watchBattery
+        isWatchConnected: this.isWatchConnected,
+        watchBattery: this.watchBattery,
+        deviceName: this.deviceName,
+        userName: this.caregiverName,
+        onNotificationClick: () => {
+          this.switchToTab(2);
+        }
       })
 
-      // Persistent emergency banner across all screens
+      // Persistent emergency banner across all screens if critical
       this.globalEmergencyBanner()
 
-      // Primary Navigation Tabs
-      Tabs({ barPosition: BarPosition.End, controller: this.tabsController }) {
-        // Tab 0: Monitor
-        TabContent() {
-          MonitorView({
-            glucose: this.glucose,
-            riskIndex: this.riskIndex,
-            currentTime: this.currentTime,
-            heartRate: this.heartRate,
-            watchBattery: this.watchBattery,
-            tremorPSD: this.tremorPSD,
-            bannerFlash: this.bannerFlash,
-            ppgContext: this.ppgContext,
-            onCanvasReady: () => {
-              this.ppgReady = true;
-              this.drawPPG();
-            },
-            onCallNow: () => {
-              this.handleCallNow();
-            },
-            onMarkWithThem: () => {
-              this.markWithThem();
-            },
-            onNavigateTab: (tabIndex: number) => {
-              this.switchToTab(tabIndex);
-            }
-          })
-        }
-        .tabBar(this.bottomTabItem(0, 'Monitor'))
+      // Primary Navigation Viewport with Floating Nav Pill
+      Stack({ alignContent: Alignment.Bottom }) {
+        // Tab Content Pages
+        Tabs({ barPosition: BarPosition.End, controller: this.tabsController }) {
+          // Tab 0: Monitor
+          TabContent() {
+            MonitorView({
+              glucose: this.glucose,
+              riskIndex: this.riskIndex,
+              currentTime: this.currentTime,
+              heartRate: this.heartRate,
+              watchBattery: this.watchBattery,
+              tremorPSD: this.tremorPSD,
+              skinTemp: this.skinTemp,
+              bannerFlash: this.bannerFlash,
+              isWatchConnected: this.isWatchConnected,
+              caregiverName: this.caregiverName,
+              caregiverPhone: this.caregiverPhone,
+              ppgContext: this.ppgContext,
+              onCanvasReady: () => {
+                this.ppgReady = true;
+                this.drawPPG();
+              },
+              onCallNow: () => {
+                this.handleCallNow();
+              },
+              onMarkWithThem: () => {
+                this.markWithThem();
+              },
+              onConnectWatch: () => {
+                this.connManager.setConnected(true);
+              },
+              onNavigateTab: (tabIndex: number) => {
+                this.switchToTab(tabIndex);
+              }
+            })
+          }
 
-        // Tab 1: Trends
-        TabContent() {
-          TrendsView({
-            glucose: this.glucose,
-            tremorPSD: this.tremorPSD,
-            riskIndex: this.riskIndex,
-            heartRate: this.heartRate,
-            currentTime: this.currentTime
-          })
-        }
-        .tabBar(this.bottomTabItem(1, 'Trends'))
+          // Tab 1: Trends
+          TabContent() {
+            TrendsView({
+              glucose: this.glucose,
+              tremorPSD: this.tremorPSD,
+              riskIndex: this.riskIndex,
+              heartRate: this.heartRate,
+              currentTime: this.currentTime
+            })
+          }
 
-        // Tab 2: Family
-        TabContent() {
-          FamilyView({
-            caregiverName: $caregiverName,
-            caregiverPhone: $caregiverPhone,
-            smnEnabled: $smnEnabled,
-            auditLog: this.auditLog,
-            smnLastSent: this.smnLastSent,
-            riskIndex: this.riskIndex,
-            glucose: this.glucose,
-            onCallNow: () => {
-              this.handleCallNow();
-            },
-            onToggleSmn: (isOn: boolean) => {
-              this.logEvent(isOn ? 'Family texts turned on' : 'Family texts turned off', 'info');
-            },
-            onSendTestSmn: () => {
-              this.sendTestSmn();
-            }
-          })
-        }
-        .tabBar(this.bottomTabItem(2, 'Family'))
+          // Tab 2: Family / Care Circle
+          TabContent() {
+            FamilyView({
+              caregiverName: $caregiverName,
+              caregiverPhone: $caregiverPhone,
+              smnEnabled: $smnEnabled,
+              auditLog: this.auditLog,
+              smnLastSent: this.smnLastSent,
+              riskIndex: this.riskIndex,
+              glucose: this.glucose,
+              onCallNow: () => {
+                this.handleCallNow();
+              },
+              onToggleSmn: (isOn: boolean) => {
+                this.logEvent(isOn ? 'Family SMS alerts enabled' : 'Family SMS alerts paused', 'info');
+              },
+              onSendTestSmn: () => {
+                this.sendTestSmn();
+              }
+            })
+          }
 
-        // Tab 3: Demo
-        TabContent() {
-          DemoView({
-            glucose: this.glucose,
-            riskIndex: this.riskIndex,
-            heartRate: this.heartRate,
-            tremorPSD: this.tremorPSD,
-            skinTemp: this.skinTemp,
-            variability: this.variability,
-            caregiverName: this.caregiverName,
-            caregiverPhone: this.caregiverPhone,
-            onSimulateStable: () => {
-              this.simulateStable();
-            },
-            onSimulatePreDrop: () => {
-              this.simulatePreDrop();
-            },
-            onSimulateCrisis: () => {
-              this.simulateCrisis();
-            },
-            onMarkWithThem: () => {
-              this.markWithThem();
-            }
-          })
+          // Tab 3: Demo & Tools
+          TabContent() {
+            DemoView({
+              glucose: this.glucose,
+              riskIndex: this.riskIndex,
+              heartRate: this.heartRate,
+              tremorPSD: this.tremorPSD,
+              skinTemp: this.skinTemp,
+              variability: this.variability,
+              caregiverName: this.caregiverName,
+              caregiverPhone: this.caregiverPhone,
+              isWatchConnected: this.isWatchConnected,
+              watchBattery: this.watchBattery,
+              deviceName: this.deviceName,
+              onSimulateStable: () => {
+                this.simulateStable();
+              },
+              onSimulatePreDrop: () => {
+                this.simulatePreDrop();
+              },
+              onSimulateCrisis: () => {
+                this.simulateCrisis();
+              },
+              onMarkWithThem: () => {
+                this.markWithThem();
+              },
+              onToggleWatchConnection: () => {
+                this.connManager.toggleConnection();
+              }
+            })
+          }
         }
-        .tabBar(this.bottomTabItem(3, 'Demo'))
+        .layoutWeight(1)
+        .barHeight(0) // Hide default bar in favor of floating pill
+        .scrollable(false)
+        .width('100%')
+        .height('100%')
+        .onChange((index: number) => {
+          this.currentTabIndex = index;
+        })
+
+        // Floating Pill Navigation Bar (Matching reference design)
+        Row() {
+          this.floatingTabButton(0)
+          this.floatingTabButton(1)
+          this.floatingTabButton(2)
+          this.floatingTabButton(3)
+        }
+        .width('84%')
+        .height(58)
+        .backgroundColor('rgba(255, 255, 255, 0.96)')
+        .borderRadius(29)
+        .shadow({ radius: 16, color: 'rgba(0, 0, 0, 0.08)', offsetY: 4 })
+        .margin({ bottom: 18 })
+        .padding({ left: 16, right: 16 })
+        .justifyContent(FlexAlign.SpaceAround)
+        .alignItems(VerticalAlign.Center)
       }
       .layoutWeight(1)
-      .barWidth('100%')
-      .barHeight(64)
-      .barMode(BarMode.Fixed)
-      .scrollable(false)
-      .backgroundColor('#FFFFFF')
-      .border({ width: { top: 1 }, color: { top: '#E3E9F2' } })
-      .shadow({ radius: 8, color: 'rgba(15,27,45,0.04)', offsetX: 0, offsetY: -2 })
-      .onChange((index: number) => {
-        this.currentTabIndex = index;
-      })
+      .width('100%')
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#EEF2F7')
+    .backgroundColor('#F9FAFC')
   }
 }
 
