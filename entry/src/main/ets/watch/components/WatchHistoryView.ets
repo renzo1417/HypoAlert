@@ -19,106 +19,58 @@ export struct WatchHistoryView {
 
   build() {
     Scroll() {
-      Column({ space: 6 }) {
-        // Top Header
-        Row() {
-          Button('Back')
-            .fontSize(9)
-            .fontColor('#8A8F98')
-            .backgroundColor(Color.Transparent)
-            .width(46)
-            .height(26)
-            .padding(0)
-            .onClick(() => {
-              this.onGoToPage(0);
-            })
-
-          Text('Night Log (5d)')
-            .fontSize(10)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-          Blank()
-            .width(46)
-            .color(Color.Transparent)
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
-
-        // Subtitle note
-        Text('Last 5 days on watch • Full logs on phone')
-          .fontSize(8)
-          .fontColor('#6E747D')
+      Column({ space: 0 }) {
+        Text('History')
+          .fontSize(9)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#E8EBEF')
           .textAlign(TextAlign.Center)
           .width('100%')
           .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        // List of Night History Cards
-        ForEach(this.historyRecords, (record: NightHistoryRecord) => {
-          Column({ space: 3 }) {
-            // Header Row: Date & Status Pill
-            Row() {
-              Text(`${record.dateShort} (${record.dayOfWeek})`)
-                .fontSize(9)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#E8EBEF')
-                .layoutWeight(1)
+        Text('LOW mmol/L')
+          .fontSize(7)
+          .fontColor('#5B616B')
+          .textAlign(TextAlign.Center)
+          .width('100%')
+          .maxLines(1)
+          .margin({ top: 2, bottom: 6 })
 
-              Text(record.status === 'CRITICAL' ? 'ALERT' : (record.status === 'WARNING' ? 'WARN' : 'OK'))
+        ForEach(this.historyRecords, (record: NightHistoryRecord, index: number) => {
+          Column({ space: 0 }) {
+            Row({ space: 6 }) {
+              Circle({ width: 5, height: 5 })
+                .fill(record.status === 'CRITICAL' ? '#FF5252' : (record.status === 'WARNING' ? '#FFB74D' : '#00E676'))
+
+              Text(record.dateShort)
                 .fontSize(8)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(record.status === 'CRITICAL' ? '#FF5252' : (record.status === 'WARNING' ? '#FFB74D' : '#00E676'))
-                .backgroundColor(record.status === 'CRITICAL' ? '#2A1215' : (record.status === 'WARNING' ? '#261C0D' : '#0E2419'))
-                .borderRadius(4)
-                .padding({ left: 4, right: 4, top: 1, bottom: 1 })
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Center)
-
-            // Value Row: Lowest Glucose & Episodes
-            Row() {
-              Row({ space: 2 }) {
-                Text(`${record.lowestGlucose.toFixed(1)}`)
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Bolder)
-                  .fontColor(record.lowestGlucose < 3.9 ? '#FF5252' : '#FFFFFF')
-                Text('mmol/L')
-                  .fontSize(8)
-                  .fontColor('#8A8F98')
-                  .margin({ bottom: 1 })
-              }
-              .alignItems(VerticalAlign.Bottom)
-
-              Blank()
-
-              Text(`${record.durationHours}h sleep`)
-                .fontSize(8)
+                .fontWeight(FontWeight.Normal)
                 .fontColor('#8A8F98')
+                .layoutWeight(1)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+              Text(record.lowestGlucose.toFixed(1))
+                .fontSize(12)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(record.lowestGlucose < 3.9 ? '#FF5252' : '#FFFFFF')
+                .maxLines(1)
             }
             .width('100%')
+            .height(28)
             .alignItems(VerticalAlign.Center)
 
-            // Actions Summary Line
-            Text(record.actionsSummary)
-              .fontSize(8)
-              .fontColor(record.status === 'CRITICAL' ? '#FF8A80' : '#8A8F98')
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
+            if (index !== this.historyRecords.length - 1) {
+              Divider()
+                .color('#1E2228')
+                .strokeWidth(1)
+                .width('100%')
+            }
           }
           .width('100%')
-          .padding({ top: 5, bottom: 5, left: 8, right: 8 })
-          .backgroundColor('#14181F')
-          .borderRadius(10)
         })
 
-        // Spacer to lift dots onto matching alignment
-        Blank().height(8)
+        Blank().height(10)
 
         WatchPageDots({
           currentPage: this.currentPage,

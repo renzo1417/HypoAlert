@@ -4,6 +4,7 @@
  */
 
 import { TremorBand, OvernightPoint } from '../models/PhoneTypes';
+import { PhoneTheme } from './PhoneTheme';
 
 /**
  * Computes a synthetic photoplethysmogram (PPG) pulse waveform sample with dicrotic notch.
@@ -43,12 +44,12 @@ export function riskLevel(risk: number): string {
 
 export function riskColor(risk: number): string {
   if (risk > 70) {
-    return '#FF3B30';
+    return PhoneTheme.STATE_CRIT;
   }
   if (risk >= 30) {
-    return '#FF9500';
+    return PhoneTheme.STATE_WARN;
   }
-  return '#34C759';
+  return PhoneTheme.STATE_OK;
 }
 
 export function heroSentence(riskIndex: number): string {
@@ -127,12 +128,12 @@ export function tempStatus(skinTemp: number): string {
 
 export function tempColor(skinTemp: number): string {
   if (skinTemp < 35.2) {
-    return '#FF3B30';
+    return PhoneTheme.STATE_CRIT;
   }
   if (skinTemp < 35.8) {
-    return '#FF9500';
+    return PhoneTheme.STATE_WARN;
   }
-  return '#34C759';
+  return PhoneTheme.STATE_OK;
 }
 
 export function computeTremorBands(tremorPSD: number): TremorBand[] {
@@ -220,12 +221,12 @@ export function computeOvernightPoints(glucose: number): OvernightPoint[] {
 
 export function getOvernightBarColor(v: number): string {
   if (v < 3.9) {
-    return '#FF3B30';
+    return PhoneTheme.STATE_CRIT;
   }
   if (v < 4.4) {
-    return '#FF9500';
+    return PhoneTheme.STATE_WARN;
   }
-  return '#2E86DE';
+  return PhoneTheme.BRAND_ACCENT;
 }
 
 export function computeOvernightEvents(tremorPSD: number, riskIndex: number): string[] {

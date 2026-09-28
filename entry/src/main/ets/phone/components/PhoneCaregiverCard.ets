@@ -1,8 +1,10 @@
 /*
  * Copyright (c) 2026 HypoAlert.
  * Phone Companion — Minimalist Caregiver Quick-Contact Card.
- * Modeled after the primary contact/physician card in modern health apps.
+ * Clean, pure white card without background accent fills.
  */
+
+import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneCaregiverCard {
@@ -17,32 +19,31 @@ export struct PhoneCaregiverCard {
     Row({ space: 12 }) {
       // Caregiver Avatar / Status Indicator
       Stack({ alignContent: Alignment.Center }) {
-        Circle({ width: 46, height: 46 })
-          .fill(this.isEmergency ? '#FEE2E2' : '#E0E7FF')
+        Circle({ width: 42, height: 42 })
+          .fill(this.isEmergency ? PhoneTheme.STATE_CRIT_BG : PhoneTheme.BG_MUTED)
 
-        // Stylized initials or caregiver symbol
         Text(this.caregiverName.length > 0 ? this.caregiverName.substring(0, 1) : 'C')
-          .fontSize(18)
+          .fontSize(16)
           .fontWeight(FontWeight.Bold)
-          .fontColor(this.isEmergency ? '#EF4444' : '#4338CA')
+          .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
       }
-      .width(46)
-      .height(46)
+      .width(42)
+      .height(42)
 
       // Name & Role Details
       Column({ space: 2 }) {
         Text(this.caregiverName)
-          .fontSize(15)
+          .fontSize(PhoneTheme.FONT_SECTION)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#111827')
+          .fontColor(PhoneTheme.TEXT_PRIMARY)
 
-        Row({ space: 6 }) {
+        Row({ space: 5 }) {
           Circle({ width: 6, height: 6 })
-            .fill(this.isEmergency ? '#EF4444' : '#22C55E')
+            .fill(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.STATE_OK)
           Text(this.isEmergency ? 'Urgent Alert Sent' : `${this.caregiverRole} • Ready`)
-            .fontSize(12)
+            .fontSize(PhoneTheme.FONT_BODY)
             .fontWeight(FontWeight.Medium)
-            .fontColor(this.isEmergency ? '#EF4444' : '#64748B')
+            .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_MUTED)
         }
         .alignItems(VerticalAlign.Center)
       }
@@ -57,27 +58,28 @@ export struct PhoneCaregiverCard {
             // Chat bubble glyph
             Column({ space: 2 }) {
               Row()
-                .width(16)
-                .height(11)
-                .backgroundColor(this.isEmergency ? '#EF4444' : '#475569')
-                .borderRadius(3)
+                .width(14)
+                .height(10)
+                .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_SECONDARY)
+                .borderRadius(2)
               Row()
-                .width(6)
+                .width(5)
                 .height(3)
-                .backgroundColor(this.isEmergency ? '#EF4444' : '#475569')
+                .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_SECONDARY)
                 .borderRadius(1)
-                .margin({ left: 3 })
+                .margin({ left: 2 })
             }
             .alignItems(HorizontalAlign.Start)
           }
-          .width(40)
-          .height(40)
+          .width(38)
+          .height(38)
         }
-        .width(40)
-        .height(40)
-        .backgroundColor('#FFFFFF')
-        .borderRadius(12)
-        .shadow({ radius: 6, color: 'rgba(0, 0, 0, 0.05)', offsetY: 2 })
+        .width(38)
+        .height(38)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.TILE_RADIUS)
         .onClick(() => {
           this.onMessage();
         })
@@ -87,24 +89,25 @@ export struct PhoneCaregiverCard {
           Stack({ alignContent: Alignment.Center }) {
             // Phone handset glyph
             Row() {
-              Circle({ width: 8, height: 8 })
-                .fill(this.isEmergency ? '#FFFFFF' : '#2563EB')
+              Circle({ width: 7, height: 7 })
+                .fill(this.isEmergency ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_PRIMARY)
               Row()
-                .width(5)
-                .height(12)
-                .backgroundColor(this.isEmergency ? '#FFFFFF' : '#2563EB')
+                .width(4)
+                .height(10)
+                .backgroundColor(this.isEmergency ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_PRIMARY)
                 .borderRadius(2)
             }
             .rotate({ angle: -25 })
           }
-          .width(40)
-          .height(40)
+          .width(38)
+          .height(38)
         }
-        .width(40)
-        .height(40)
-        .backgroundColor(this.isEmergency ? '#EF4444' : '#FFFFFF')
-        .borderRadius(12)
-        .shadow({ radius: 6, color: 'rgba(0, 0, 0, 0.05)', offsetY: 2 })
+        .width(38)
+        .height(38)
+        .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.TILE_RADIUS)
         .onClick(() => {
           this.onCall();
         })
@@ -112,9 +115,12 @@ export struct PhoneCaregiverCard {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .backgroundColor('#EEF2FE')
-    .borderRadius(20)
+    .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+    .backgroundColor(PhoneTheme.BG_CARD)
+    .borderWidth(1)
+    .borderColor(PhoneTheme.BORDER_SUBTLE)
+    .borderRadius(PhoneTheme.CARD_RADIUS)
+    .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
     .alignItems(VerticalAlign.Center)
   }
 }

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Caregiver dashboard coordinator with floating pill navigation.
- * Redesigned to match the modern, serene health monitoring aesthetic.
+ * Phone Companion — Bedside Coordinator with 3 Clinical Navigation Tabs.
+ * 1. Monitor (Bedside Guardian) • 2. History (Overnight Trajectory) • 3. Guardian (Settings & Dispatch).
  */
 
 import { AlertService } from '../services/AlertService';
@@ -10,11 +10,12 @@ import { formatLocalTime, formatLogTime } from '../common/utils/TimeUtils';
 import { AuditEntry } from './models/PhoneTypes';
 import { HistoryRepository } from '../models/HistoryModel';
 import { ppgSample, computeRiskIndex, riskLevel } from './utils/PhoneRiskUtils';
+import { PhoneTheme } from './utils/PhoneTheme';
 import { PhoneTopBar } from './components/PhoneTopBar';
+import { DemoSheet } from './components/DemoSheet';
 import { MonitorView } from './views/MonitorView';
 import { TrendsView } from './views/TrendsView';
 import { FamilyView } from './views/FamilyView';
-import { DemoView } from './views/DemoView';
 
 @Component
 export struct PhonePage {
@@ -29,6 +30,7 @@ export struct PhonePage {
   @State watchBattery: number = 86;
   @State isWatchConnected: boolean = true;
   @State deviceName: string = 'HUAWEI WATCH 4 Pro';
+  @State isTestSheetOpen: boolean = false;
 
   @State caregiverName: string = 'Maria Santos';
   @State caregiverPhone: string = '+63 917 123 4567';
@@ -170,7 +172,7 @@ export struct PhonePage {
     ctx.lineTo(W, gy);
     ctx.stroke();
     ctx.beginPath();
-    ctx.strokeStyle = '#60A5FA';
+    ctx.strokeStyle = '#38BDF8';
     ctx.lineWidth = 2;
     const n: number = this.ppgData.length;
     for (let i: number = 0; i < n; i++) {
@@ -247,7 +249,7 @@ export struct PhonePage {
     this.glucose = 4.6;
     this.tremorPSD = 0.4;
     this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('Caregiver confirmed assistance • Alarm silenced', 'ok');
+    this.logEvent('Patient awake confirmed • Alarm silenced', 'ok');
     HistoryRepository.updateTonightResolved();
   }
 
@@ -287,139 +289,104 @@ export struct PhonePage {
     if (this.isEmergency()) {
       Row({ space: 10 }) {
         Stack({ alignContent: Alignment.Center }) {
-          Circle({ width: 28, height: 28 })
-            .fill('#FFFFFF')
+          Circle({ width: 26, height: 26 })
+            .fill(PhoneTheme.BG_CARD)
           Text('!')
-            .fontSize(16)
+            .fontSize(14)
             .fontWeight(FontWeight.Bolder)
-            .fontColor('#EF4444')
+            .fontColor(PhoneTheme.STATE_CRIT)
         }
-        .width(28)
-        .height(28)
+        .width(26)
+        .height(26)
 
         Column({ space: 1 }) {
-          Text('CRITICAL EMERGENCY')
-            .fontSize(12)
+          Text('CRITICAL NOCTURNAL HYPOGLYCEMIA')
+            .fontSize(PhoneTheme.FONT_BODY)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-          Text('Glucose 3.1 mmol/L • Alarm ringing')
-            .fontSize(11)
-            .fontColor('#FFFFFF')
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
+          Text('3.1 mmol/L • Wrist haptics & bedside siren active')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
 
-        Button("I'm with them")
-          .fontSize(12)
+        Button("I'm Awake")
+          .fontSize(PhoneTheme.FONT_CAPTION)
           .fontWeight(FontWeight.Bold)
-          .height(32)
-          .backgroundColor('#FFFFFF')
-          .fontColor('#EF4444')
-          .borderRadius(10)
+          .height(30)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .fontColor(PhoneTheme.STATE_CRIT)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
           .onClick(() => {
             this.markWithThem();
           })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 8, bottom: 8 })
-      .backgroundColor('#EF4444')
-      .opacity(this.bannerFlash ? 1.0 : 0.88)
+      .padding({ left: 16, right: 16, top: 7, bottom: 7 })
+      .backgroundColor(PhoneTheme.STATE_CRIT)
+      .opacity(this.bannerFlash ? 1.0 : 0.9)
     }
   }
 
   @Builder
-  floatingTabButton(index: number) {
+  floatingTabButton(index: number, label: string) {
     Button() {
-      Stack({ alignContent: Alignment.Center }) {
-        if (this.currentTabIndex === index) {
-          Circle({ width: 42, height: 42 })
-            .fill('#111827')
-        }
+      Column({ space: 2 }) {
+        Stack({ alignContent: Alignment.Center }) {
+          if (this.currentTabIndex === index) {
+            Circle({ width: 34, height: 34 })
+              .fill(PhoneTheme.BRAND_PRIMARY)
+          }
 
-        // Vector Icon matching reference design
-        if (index === 0) {
-          // Tab 0: Home / Monitor
-          Column({ space: 1 }) {
-            Row()
-              .width(12)
-              .height(6)
-              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-              .borderRadius({ topLeft: 6, topRight: 6 })
-            Row()
-              .width(14)
-              .height(8)
-              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-              .borderRadius({ bottomLeft: 2, bottomRight: 2 })
-          }
-          .alignItems(HorizontalAlign.Center)
-        } else if (index === 1) {
-          // Tab 1: Trends
-          Row({ space: 2 }) {
-            Row()
-              .width(3)
-              .height(8)
-              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-              .borderRadius(1.5)
-            Row()
-              .width(3)
-              .height(14)
-              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-              .borderRadius(1.5)
-            Row()
-              .width(3)
-              .height(10)
-              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-              .borderRadius(1.5)
-          }
-          .alignItems(VerticalAlign.Bottom)
-        } else if (index === 2) {
-          // Tab 2: Care Circle / Family (Chat bubble)
-          Stack({ alignContent: Alignment.Center }) {
-            Column({ space: 1 }) {
-              Row()
-                .width(14)
-                .height(10)
-                .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-                .borderRadius(3)
-              Row()
-                .width(5)
-                .height(3)
-                .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-                .borderRadius(1)
-                .margin({ left: 3 })
+          if (index === 0) {
+            // Monitor Icon (Bedside Pulse)
+            Row({ space: 2 }) {
+              Row().width(3).height(8).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
+              Row().width(3).height(14).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
+              Row().width(3).height(6).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
             }
-            .alignItems(HorizontalAlign.Start)
+            .alignItems(VerticalAlign.Center)
+          } else if (index === 1) {
+            // History Icon (Progression Bars)
+            Row({ space: 2 }) {
+              Row().width(3).height(6).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
+              Row().width(3).height(10).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
+              Row().width(3).height(14).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
+            }
+            .alignItems(VerticalAlign.Bottom)
+          } else {
+            // Guardian Icon (Shield)
+            Stack({ alignContent: Alignment.Center }) {
+              Row()
+                .width(12)
+                .height(14)
+                .backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY)
+                .borderRadius({ topLeft: 2, topRight: 2, bottomLeft: 6, bottomRight: 6 })
 
-            // Alert dot on Care Circle tab during emergency
-            if (this.isEmergency()) {
-              Circle({ width: 6, height: 6 })
-                .fill('#EF4444')
-                .offset({ x: 8, y: -6 })
+              if (this.isEmergency()) {
+                Circle({ width: 5, height: 5 })
+                  .fill(PhoneTheme.STATE_CRIT)
+                  .offset({ x: 6, y: -6 })
+              }
             }
+            .width(16)
+            .height(16)
           }
-          .width(18)
-          .height(18)
-        } else {
-          // Tab 3: Demo / Tools (Sliders)
-          Row({ space: 2 }) {
-            Circle({ width: 4, height: 4 })
-              .fill(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-            Row()
-              .width(8)
-              .height(3)
-              .backgroundColor(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-              .borderRadius(1.5)
-            Circle({ width: 4, height: 4 })
-              .fill(this.currentTabIndex === index ? '#FFFFFF' : '#94A3B8')
-          }
-          .alignItems(VerticalAlign.Center)
         }
+        .width(36)
+        .height(36)
+
+        Text(label)
+          .fontSize(PhoneTheme.FONT_MICRO)
+          .fontWeight(this.currentTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
+          .fontColor(this.currentTabIndex === index ? PhoneTheme.TEXT_PRIMARY : PhoneTheme.TEXT_MUTED)
       }
-      .width(44)
-      .height(44)
+      .alignItems(HorizontalAlign.Center)
+      .justifyContent(FlexAlign.Center)
     }
-    .width(44)
-    .height(44)
+    .layoutWeight(1)
+    .height(48)
     .backgroundColor('transparent')
     .onClick(() => {
       this.switchToTab(index);
@@ -427,28 +394,26 @@ export struct PhonePage {
   }
 
   build() {
-    Column() {
-      // Top Bar (clean greeting + watch pill + notification bell)
-      PhoneTopBar({
-        currentTime: this.currentTime,
-        isEmergency: this.isEmergency(),
-        isWatchConnected: this.isWatchConnected,
-        watchBattery: this.watchBattery,
-        deviceName: this.deviceName,
-        userName: this.caregiverName,
-        onNotificationClick: () => {
-          this.switchToTab(2);
-        }
-      })
+    Stack({ alignContent: Alignment.Bottom }) {
+      Column() {
+        // Bedside Status Header
+        PhoneTopBar({
+          currentTime: this.currentTime,
+          isEmergency: this.isEmergency(),
+          isWatchConnected: this.isWatchConnected,
+          watchBattery: this.watchBattery,
+          deviceName: this.deviceName,
+          onOpenTest: () => {
+            this.isTestSheetOpen = !this.isTestSheetOpen;
+          }
+        })
 
-      // Persistent emergency banner across all screens if critical
-      this.globalEmergencyBanner()
+        // Emergency banner across all screens if critical
+        this.globalEmergencyBanner()
 
-      // Primary Navigation Viewport with Floating Nav Pill
-      Stack({ alignContent: Alignment.Bottom }) {
-        // Tab Content Pages
+        // 3 Primary Viewports
         Tabs({ barPosition: BarPosition.End, controller: this.tabsController }) {
-          // Tab 0: Monitor
+          // Tab 0: Monitor (Bedside Guardian)
           TabContent() {
             MonitorView({
               glucose: this.glucose,
@@ -482,7 +447,7 @@ export struct PhonePage {
             })
           }
 
-          // Tab 1: Trends
+          // Tab 1: History (Overnight Trajectory)
           TabContent() {
             TrendsView({
               glucose: this.glucose,
@@ -493,13 +458,12 @@ export struct PhonePage {
             })
           }
 
-          // Tab 2: Family / Care Circle
+          // Tab 2: Guardian (Settings & SMN Dispatch)
           TabContent() {
             FamilyView({
               caregiverName: $caregiverName,
               caregiverPhone: $caregiverPhone,
               smnEnabled: $smnEnabled,
-              auditLog: this.auditLog,
               smnLastSent: this.smnLastSent,
               riskIndex: this.riskIndex,
               glucose: this.glucose,
@@ -507,78 +471,82 @@ export struct PhonePage {
                 this.handleCallNow();
               },
               onToggleSmn: (isOn: boolean) => {
-                this.logEvent(isOn ? 'Family SMS alerts enabled' : 'Family SMS alerts paused', 'info');
+                this.logEvent(isOn ? 'Family SMS dispatch enabled' : 'Family SMS dispatch paused', 'info');
               },
               onSendTestSmn: () => {
                 this.sendTestSmn();
               }
             })
           }
-
-          // Tab 3: Demo & Tools
-          TabContent() {
-            DemoView({
-              glucose: this.glucose,
-              riskIndex: this.riskIndex,
-              heartRate: this.heartRate,
-              tremorPSD: this.tremorPSD,
-              skinTemp: this.skinTemp,
-              variability: this.variability,
-              caregiverName: this.caregiverName,
-              caregiverPhone: this.caregiverPhone,
-              isWatchConnected: this.isWatchConnected,
-              watchBattery: this.watchBattery,
-              deviceName: this.deviceName,
-              onSimulateStable: () => {
-                this.simulateStable();
-              },
-              onSimulatePreDrop: () => {
-                this.simulatePreDrop();
-              },
-              onSimulateCrisis: () => {
-                this.simulateCrisis();
-              },
-              onMarkWithThem: () => {
-                this.markWithThem();
-              },
-              onToggleWatchConnection: () => {
-                this.connManager.toggleConnection();
-              }
-            })
-          }
         }
         .layoutWeight(1)
-        .barHeight(0) // Hide default bar in favor of floating pill
+        .barHeight(0)
         .scrollable(false)
         .width('100%')
         .height('100%')
         .onChange((index: number) => {
           this.currentTabIndex = index;
         })
-
-        // Floating Pill Navigation Bar (Matching reference design)
-        Row() {
-          this.floatingTabButton(0)
-          this.floatingTabButton(1)
-          this.floatingTabButton(2)
-          this.floatingTabButton(3)
-        }
-        .width('84%')
-        .height(58)
-        .backgroundColor('rgba(255, 255, 255, 0.96)')
-        .borderRadius(29)
-        .shadow({ radius: 16, color: 'rgba(0, 0, 0, 0.08)', offsetY: 4 })
-        .margin({ bottom: 18 })
-        .padding({ left: 16, right: 16 })
-        .justifyContent(FlexAlign.SpaceAround)
-        .alignItems(VerticalAlign.Center)
       }
-      .layoutWeight(1)
       .width('100%')
+      .height('100%')
+      .backgroundColor(PhoneTheme.BG_PAGE)
+
+      // Floating 3-Tab Navigation Bar
+      Row() {
+        this.floatingTabButton(0, 'Monitor')
+        this.floatingTabButton(1, 'History')
+        this.floatingTabButton(2, 'Guardian')
+      }
+      .width('76%')
+      .height(56)
+      .backgroundColor(PhoneTheme.BG_CARD)
+      .borderRadius(28)
+      .borderWidth(1)
+      .borderColor(PhoneTheme.BORDER_SUBTLE)
+      .shadow({ radius: 12, color: 'rgba(15, 23, 42, 0.08)', offsetY: 3 })
+      .margin({ bottom: 16 })
+      .padding({ left: 10, right: 10 })
+      .justifyContent(FlexAlign.SpaceAround)
+      .alignItems(VerticalAlign.Center)
+
+      // Test Scenario Slide-up Overlay Sheet
+      if (this.isTestSheetOpen) {
+        Column() {
+          Blank()
+            .onClick(() => {
+              this.isTestSheetOpen = false;
+            })
+
+          DemoSheet({
+            isWatchConnected: this.isWatchConnected,
+            watchBattery: this.watchBattery,
+            deviceName: this.deviceName,
+            onSimulateStable: () => {
+              this.simulateStable();
+            },
+            onSimulatePreDrop: () => {
+              this.simulatePreDrop();
+            },
+            onSimulateCrisis: () => {
+              this.simulateCrisis();
+            },
+            onToggleWatchConnection: () => {
+              this.connManager.toggleConnection();
+            },
+            onClose: () => {
+              this.isTestSheetOpen = false;
+            }
+          })
+          .padding({ bottom: 20 })
+        }
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(15, 23, 42, 0.4)')
+      }
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F9FAFC')
   }
 }
 

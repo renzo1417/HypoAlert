@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Screen 1: Serene, minimalist nocturnal health dashboard.
- * Modeled after the reference health monitoring mobile UI.
+ * Phone Companion — Screen 1: Bedside Nocturnal Guardian Monitor.
+ * Ultra-clean, distraction-free bedside dashboard designed for nighttime glanceability.
  */
 
 import { PhoneHeroCard } from '../components/PhoneHeroCard';
 import { PhoneMetricGrid } from '../components/PhoneMetricGrid';
-import { PhoneCaregiverCard } from '../components/PhoneCaregiverCard';
+import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct MonitorView {
@@ -30,79 +30,47 @@ export struct MonitorView {
 
   build() {
     Scroll() {
-      Column({ space: 16 }) {
-        // Watch offline reminder (minimalist soft card)
+      Column({ space: 14 }) {
+        // Watch offline reminder banner (only visible when BLE disconnected)
         if (!this.isWatchConnected) {
           Row({ space: 10 }) {
-            Circle({ width: 8, height: 8 })
-              .fill('#F59E0B')
+            Circle({ width: 7, height: 7 })
+              .fill(PhoneTheme.STATE_WARN)
+
             Column({ space: 1 }) {
-              Text('Wearable Disconnected')
-                .fontSize(13)
+              Text('Watch Disconnected')
+                .fontSize(PhoneTheme.FONT_SUBTITLE)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#111827')
-              Text('Tap to link demo watch stream')
-                .fontSize(11)
-                .fontColor('#64748B')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Text('Link watch stream to resume nocturnal monitoring')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
 
             Button('Connect')
-              .fontSize(12)
+              .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
-              .height(32)
-              .padding({ left: 14, right: 14 })
-              .backgroundColor('#111827')
-              .fontColor('#FFFFFF')
-              .borderRadius(16)
+              .height(30)
+              .padding({ left: 12, right: 12 })
+              .backgroundColor(PhoneTheme.BRAND_PRIMARY)
+              .fontColor(PhoneTheme.TEXT_ON_DARK)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
               .onClick(() => {
                 this.onConnectWatch();
               })
           }
           .width('100%')
           .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-          .backgroundColor('#FFFBEB')
-          .borderRadius(18)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderWidth(1)
+          .borderColor(PhoneTheme.STATE_WARN)
+          .borderRadius(PhoneTheme.CARD_RADIUS)
           .alignItems(VerticalAlign.Center)
         }
 
-        // Clinical Header: Nocturnal Hypoglycemia Guardian
-        Row() {
-          Column({ space: 2 }) {
-            Row({ space: 8 }) {
-              Text('Nocturnal Guardian')
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#111827')
-
-              // Pulse radar indicator
-              Row({ space: 4 }) {
-                Circle({ width: 6, height: 6 })
-                  .fill(this.isWatchConnected ? '#10B981' : '#F59E0B')
-                Text(this.isWatchConnected ? 'ARMED' : 'OFFLINE')
-                  .fontSize(10)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(this.isWatchConnected ? '#15803D' : '#B45309')
-              }
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-              .backgroundColor(this.isWatchConnected ? '#DCFCE7' : '#FEF3C7')
-              .borderRadius(999)
-            }
-            .alignItems(VerticalAlign.Center)
-
-            Text('Non-invasive sympathetic surge early warning system')
-              .fontSize(12)
-              .fontColor('#64748B')
-              .margin({ top: 2 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-        }
-        .width('100%')
-        .padding({ left: 4, right: 4, top: 2 })
-
-        // Hero Card (Glucose & Nocturnal State)
+        // Primary Hero Card: Glycemic state, Risk gauge, and crisis actions
         PhoneHeroCard({
           glucose: this.glucose,
           riskIndex: this.riskIndex,
@@ -115,22 +83,7 @@ export struct MonitorView {
           onMarkWithThem: this.onMarkWithThem
         })
 
-        // Vitals Section Header
-        Row() {
-          Text('Vitals at a glance')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#111827')
-          Blank()
-          Text(this.isWatchConnected ? 'Live stream •' : 'Paused')
-            .fontSize(12)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.isWatchConnected ? '#15803D' : '#94A3B8')
-        }
-        .width('100%')
-        .padding({ left: 4, right: 4, top: 4 })
-
-        // 2x2 Bento Metric Grid (Heart Rate, Sleep Motion, Temp, Stability)
+        // Core Sympathetic Biomarkers (Tremor, Pulse, Temp, Baseline)
         PhoneMetricGrid({
           heartRate: this.heartRate,
           tremorPSD: this.tremorPSD,
@@ -140,21 +93,20 @@ export struct MonitorView {
           onCanvasReady: this.onCanvasReady
         })
 
-        // Caregiver Contact Card (Matching reference design doctor card)
-        PhoneCaregiverCard({
-          caregiverName: this.caregiverName,
-          caregiverRole: 'Primary Caregiver',
-          caregiverPhone: this.caregiverPhone,
-          isEmergency: this.riskIndex > 70,
-          onCall: this.onCallNow,
-          onMessage: () => {
-            this.onNavigateTab(2); // Jump to Care Circle / Family tab
-          }
-        })
-        .margin({ top: 4, bottom: 20 })
+        // Calming Bedside Safeguard Footer Notice
+        Row({ space: 6 }) {
+          Circle({ width: 4, height: 4 }).fill(PhoneTheme.TEXT_TERTIARY)
+          Text('Bedside Guardian: Haptic wrist alert sounds loud phone siren if unawakened')
+            .fontSize(PhoneTheme.FONT_MICRO)
+            .fontColor(PhoneTheme.TEXT_TERTIARY)
+            .layoutWeight(1)
+        }
+        .width('100%')
+        .padding({ left: 4, right: 4, top: 4, bottom: 20 })
+        .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 6, bottom: 40 })
+      .padding({ left: 18, right: 18, top: 6, bottom: 36 })
     }
     .width('100%')
     .height('100%')

@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2026 HypoAlert.
  * Phone Companion — Screen 4: Clinical simulation and cross-device testing.
- * Clean, soft pastel interface for testing scenarios without developer clutter.
+ * Clean, clinical simulation suite without loud pastel fills.
  */
 
 import { riskLevel } from '../utils/PhoneRiskUtils';
+import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct DemoView {
@@ -31,56 +32,56 @@ export struct DemoView {
 
   build() {
     Scroll() {
-      Column({ space: 16 }) {
+      Column({ space: 14 }) {
         // Screen Header
-        Column({ space: 4 }) {
+        Column({ space: 2 }) {
           Row() {
             Text('Simulation & Tools')
-              .fontSize(24)
+              .fontSize(PhoneTheme.FONT_TITLE)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#111827')
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
             Blank()
-            Text('Test Scenarios')
-              .fontSize(12)
+            Text('Test Mode')
+              .fontSize(PhoneTheme.FONT_CAPTION)
               .fontWeight(FontWeight.Medium)
-              .fontColor('#2563EB')
-              .backgroundColor('#EFF6FF')
-              .borderRadius(999)
-              .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+              .fontColor(PhoneTheme.BRAND_ACCENT)
+              .backgroundColor(PhoneTheme.BRAND_ACCENT_BG)
+              .borderRadius(PhoneTheme.PILL_RADIUS)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
 
           Text('Test emergency alert presets and wearable link')
-            .fontSize(13)
-            .fontColor('#64748B')
+            .fontSize(PhoneTheme.FONT_BODY)
+            .fontColor(PhoneTheme.TEXT_MUTED)
             .width('100%')
         }
         .width('100%')
-        .padding({ left: 4, right: 4 })
+        .padding({ left: 2, right: 2 })
 
-        // Cross-Device Watch Connection (Clean Card)
-        Column({ space: 12 }) {
+        // Cross-Device Watch Connection Card
+        Column({ space: 10 }) {
           Row() {
-            Row({ space: 8 }) {
-              Circle({ width: 8, height: 8 })
-                .fill(this.isWatchConnected ? '#22C55E' : '#F59E0B')
+            Row({ space: 6 }) {
+              Circle({ width: 6, height: 6 })
+                .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.STATE_WARN)
               Text('Wearable Link')
-                .fontSize(15)
+                .fontSize(PhoneTheme.FONT_SECTION)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#111827')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
             }
             .alignItems(VerticalAlign.Center)
 
             Blank()
 
             Text(this.isWatchConnected ? 'Connected' : 'Offline')
-              .fontSize(11)
+              .fontSize(PhoneTheme.FONT_MICRO)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.isWatchConnected ? '#15803D' : '#B45309')
-              .backgroundColor(this.isWatchConnected ? '#DCFCE7' : '#FEF3C7')
-              .borderRadius(999)
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .fontColor(this.isWatchConnected ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.STATE_WARN_TEXT)
+              .backgroundColor(this.isWatchConnected ? PhoneTheme.STATE_OK_BG : PhoneTheme.STATE_WARN_BG)
+              .borderRadius(PhoneTheme.PILL_RADIUS)
+              .padding({ left: 7, right: 7, top: 3, bottom: 3 })
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
@@ -88,195 +89,207 @@ export struct DemoView {
           Row({ space: 8 }) {
             Column({ space: 1 }) {
               Text(this.deviceName)
-                .fontSize(13)
+                .fontSize(PhoneTheme.FONT_BODY)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#111827')
-              Text(this.isWatchConnected ? `Battery: ${this.watchBattery}% • Signal: Excellent` : 'Telemetry stream paused')
-                .fontSize(11)
-                .fontColor('#64748B')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Text(this.isWatchConnected ? `Battery: ${this.watchBattery}% • Signal: Good` : 'Telemetry stream paused')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
 
             Button(this.isWatchConnected ? 'Disconnect' : 'Connect')
-              .fontSize(12)
+              .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
-              .height(34)
-              .padding({ left: 14, right: 14 })
-              .backgroundColor(this.isWatchConnected ? '#FEE2E2' : '#111827')
-              .fontColor(this.isWatchConnected ? '#EF4444' : '#FFFFFF')
-              .borderRadius(10)
+              .height(32)
+              .padding({ left: 12, right: 12 })
+              .backgroundColor(this.isWatchConnected ? PhoneTheme.STATE_CRIT_BG : PhoneTheme.BRAND_PRIMARY)
+              .fontColor(this.isWatchConnected ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_ON_DARK)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
               .onClick(() => {
                 this.onToggleWatchConnection();
               })
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
-          .padding(12)
-          .backgroundColor('#F8FAFC')
-          .borderRadius(14)
+          .padding(10)
+          .backgroundColor(PhoneTheme.BG_PAGE)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
         }
         .width('100%')
-        .padding(18)
-        .backgroundColor('#FFFFFF')
-        .borderRadius(22)
-        .shadow({ radius: 8, color: 'rgba(0, 0, 0, 0.04)', offsetY: 2 })
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+        .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
 
         // Dismiss action if currently in emergency
         if (this.isEmergency()) {
           Row({ space: 10 }) {
             Column({ space: 2 }) {
               Text('Emergency Active!')
-                .fontSize(14)
+                .fontSize(PhoneTheme.FONT_SECTION)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#EF4444')
-              Text('Alarm sounding • Tap when you are assisting')
-                .fontSize(11)
-                .fontColor('#64748B')
+                .fontColor(PhoneTheme.STATE_CRIT)
+              Text('Alarm sounding • Tap to confirm assistance')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
 
             Button("I'm with them")
-              .fontSize(13)
+              .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
-              .height(36)
-              .backgroundColor('#EF4444')
-              .fontColor('#FFFFFF')
-              .borderRadius(10)
+              .height(34)
+              .backgroundColor(PhoneTheme.STATE_CRIT)
+              .fontColor(PhoneTheme.TEXT_ON_DARK)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
               .onClick(() => {
                 this.onMarkWithThem();
               })
           }
           .width('100%')
-          .padding(14)
-          .backgroundColor('#FEE2E2')
-          .borderRadius(18)
+          .padding(12)
+          .backgroundColor(PhoneTheme.STATE_CRIT_BG)
+          .borderRadius(PhoneTheme.CARD_RADIUS)
         }
 
-        // Clinical Scenario Presets (Soft Pastel Cards)
-        Column({ space: 12 }) {
+        // Clinical Scenario Presets (Clean White Cards, No Pastel Slabs)
+        Column({ space: 10 }) {
           Row() {
             Text('Quick Presets')
-              .fontSize(16)
+              .fontSize(PhoneTheme.FONT_SECTION)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#111827')
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
             Blank()
             Text('Tap to simulate')
-              .fontSize(11)
-              .fontColor('#94A3B8')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontColor(PhoneTheme.TEXT_TERTIARY)
           }
           .width('100%')
 
           // Preset 1: Stable
           Row({ space: 10 }) {
-            Circle({ width: 10, height: 10 }).fill('#22C55E')
-            Column({ space: 1 }) {
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_OK)
+            Column({ space: 2 }) {
               Text('1. Stable Sleep (5.5 mmol/L)')
-                .fontSize(14)
+                .fontSize(PhoneTheme.FONT_BODY)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#15803D')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
               Text('Normal resting vitals and calm sleep')
-                .fontSize(11)
-                .fontColor('#166534')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
           }
           .width('100%')
-          .padding(14)
-          .backgroundColor('#DCFCE7')
-          .borderRadius(14)
+          .padding(12)
+          .backgroundColor(PhoneTheme.BG_PAGE)
+          .borderWidth(1)
+          .borderColor(PhoneTheme.BORDER_SUBTLE)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
           .onClick(() => {
             this.onSimulateStable();
           })
 
           // Preset 2: Pre-Drop
           Row({ space: 10 }) {
-            Circle({ width: 10, height: 10 }).fill('#F59E0B')
-            Column({ space: 1 }) {
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_WARN)
+            Column({ space: 2 }) {
               Text('2. Impending Drop (4.2 mmol/L)')
-                .fontSize(14)
+                .fontSize(PhoneTheme.FONT_BODY)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#B45309')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
               Text('Glucose trending down, restlessness rising')
-                .fontSize(11)
-                .fontColor('#92400E')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
           }
           .width('100%')
-          .padding(14)
-          .backgroundColor('#FEF3C7')
-          .borderRadius(14)
+          .padding(12)
+          .backgroundColor(PhoneTheme.BG_PAGE)
+          .borderWidth(1)
+          .borderColor(PhoneTheme.BORDER_SUBTLE)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
           .onClick(() => {
             this.onSimulatePreDrop();
           })
 
           // Preset 3: Crisis
           Row({ space: 10 }) {
-            Circle({ width: 10, height: 10 }).fill('#EF4444')
-            Column({ space: 1 }) {
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_CRIT)
+            Column({ space: 2 }) {
               Text('3. Severe Emergency (3.1 mmol/L)')
-                .fontSize(14)
+                .fontSize(PhoneTheme.FONT_BODY)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#B91C1C')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
               Text('Critical hypoglycemia, watch alarm & SMS alert')
-                .fontSize(11)
-                .fontColor('#991B1B')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
           }
           .width('100%')
-          .padding(14)
-          .backgroundColor('#FEE2E2')
-          .borderRadius(14)
+          .padding(12)
+          .backgroundColor(PhoneTheme.BG_PAGE)
+          .borderWidth(1)
+          .borderColor(PhoneTheme.BORDER_SUBTLE)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
           .onClick(() => {
             this.onSimulateCrisis();
           })
         }
         .width('100%')
-        .padding(18)
-        .backgroundColor('#FFFFFF')
-        .borderRadius(22)
-        .shadow({ radius: 8, color: 'rgba(0, 0, 0, 0.04)', offsetY: 2 })
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+        .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
 
-        // Huawei Cloud SMN Status Card (Replaced messy raw JSON)
-        Column({ space: 10 }) {
-          Row({ space: 8 }) {
-            Circle({ width: 6, height: 6 }).fill('#2563EB')
+        // Huawei Cloud SMN Status Card
+        Column({ space: 8 }) {
+          Row({ space: 6 }) {
+            Circle({ width: 6, height: 6 }).fill(PhoneTheme.BRAND_ACCENT)
             Text('Huawei Cloud SMN Status')
-              .fontSize(14)
+              .fontSize(PhoneTheme.FONT_SECTION)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#111827')
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
           }
           .width('100%')
 
-          Row({ space: 8 }) {
-            Text('SMS alerts armed for')
-              .fontSize(12)
-              .fontColor('#64748B')
+          Row({ space: 6 }) {
+            Text('SMS alerts armed for:')
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontColor(PhoneTheme.TEXT_MUTED)
             Text(this.caregiverPhone)
-              .fontSize(12)
+              .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#111827')
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
           }
 
           Text('Automatic priority dispatch triggers whenever glucose dips under 3.9 mmol/L.')
-            .fontSize(11)
-            .fontColor('#94A3B8')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_TERTIARY)
             .width('100%')
         }
         .width('100%')
-        .padding(18)
-        .backgroundColor('#FFFFFF')
-        .borderRadius(22)
-        .shadow({ radius: 8, color: 'rgba(0, 0, 0, 0.04)', offsetY: 2 })
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+        .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 6, bottom: 40 })
+      .padding({ left: 18, right: 18, top: 4, bottom: 36 })
     }
     .width('100%')
     .height('100%')

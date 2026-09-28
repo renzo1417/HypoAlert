@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 HypoAlert.
  * Phone Companion — Clinical-Grade Hero Status Card with Circular Hypoglycemia Risk Gauge.
- * Dual-readout: Real-time Sympathetic Probability (0-100%) & Estimated Glycemic Trajectory (mmol/L).
+ * Dual-readout: On-Device Sympathetic Surge Probability (0-100%) & Estimated Glycemic Trajectory (mmol/L).
  */
 
 import {
@@ -10,6 +10,7 @@ import {
   trendWord,
   riskColor
 } from '../utils/PhoneRiskUtils';
+import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneHeroCard {
@@ -33,52 +34,49 @@ export struct PhoneHeroCard {
 
   private getCardBg(): string {
     if (this.isEmergency()) {
-      return '#EF4444';
+      return PhoneTheme.STATE_CRIT;
     }
-    if (this.isWarning()) {
-      return '#FFFBEB';
-    }
-    return '#FFFFFF';
+    return PhoneTheme.BG_CARD;
   }
 
   private getBorderColor(): string {
     if (this.isEmergency()) {
-      return '#DC2626';
+      return PhoneTheme.STATE_CRIT_DARK;
     }
     if (this.isWarning()) {
-      return '#FDE68A';
+      return PhoneTheme.STATE_WARN;
     }
-    return '#E2E8F0';
+    return PhoneTheme.BORDER_SUBTLE;
   }
 
   private getRingColor(): string {
     if (this.isEmergency()) {
-      return '#FFFFFF';
+      return PhoneTheme.TEXT_ON_DARK;
     }
     if (this.isWarning()) {
-      return '#F59E0B';
+      return PhoneTheme.STATE_WARN;
     }
-    return '#10B981';
+    return PhoneTheme.STATE_OK;
   }
 
   private getRingBgColor(): string {
     if (this.isEmergency()) {
       return 'rgba(255, 255, 255, 0.25)';
     }
-    return '#F1F5F9';
+    return PhoneTheme.BG_MUTED;
   }
 
   build() {
-    Column({ space: 14 }) {
+    Column({ space: 12 }) {
       // Top Row: Category Header + Status Badge
       Row() {
         Row({ space: 6 }) {
-          Circle({ width: 7, height: 7 })
-            .fill(this.isEmergency() ? '#FFFFFF' : riskColor(this.riskIndex))
-          Text('AI Hypoglycemia Early Warning')
-            .fontSize(12)
+          Circle({ width: 6, height: 6 })
+            .fill(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : riskColor(this.riskIndex))
+          Text('Nocturnal Glycemic State')
+            .fontSize(PhoneTheme.FONT_BODY)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? '#FFFFFF' : '#475569')
+            .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
         }
         .alignItems(VerticalAlign.Center)
 
@@ -86,15 +84,15 @@ export struct PhoneHeroCard {
 
         // Status Badge
         Row({ space: 4 }) {
-          Circle({ width: 6, height: 6 })
-            .fill(this.isEmergency() ? '#EF4444' : (this.isWarning() ? '#B45309' : '#15803D'))
+          Circle({ width: 5, height: 5 })
+            .fill(this.isEmergency() ? PhoneTheme.STATE_CRIT : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT))
           Text(this.isEmergency() ? 'CRITICAL ALERT' : (this.isWarning() ? 'PRE-DROP DIP' : 'ALL CLEAR'))
-            .fontSize(10)
+            .fontSize(PhoneTheme.FONT_MICRO)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? '#EF4444' : (this.isWarning() ? '#B45309' : '#15803D'))
+            .fontColor(this.isEmergency() ? PhoneTheme.STATE_CRIT : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT))
         }
-        .backgroundColor(this.isEmergency() ? '#FFFFFF' : (this.isWarning() ? '#FEF3C7' : '#DCFCE7'))
-        .borderRadius(999)
+        .backgroundColor(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_BG : PhoneTheme.STATE_OK_BG))
+        .borderRadius(PhoneTheme.PILL_RADIUS)
         .padding({ left: 8, right: 8, top: 3, bottom: 3 })
       }
       .width('100%')
@@ -111,54 +109,51 @@ export struct PhoneHeroCard {
           })
             .color(this.getRingColor())
             .backgroundColor(this.getRingBgColor())
-            .style({ strokeWidth: 8 })
-            .width(82)
-            .height(82)
+            .style({ strokeWidth: 7 })
+            .width(72)
+            .height(72)
 
           Column({ space: 1 }) {
             Text(`${this.riskIndex}%`)
-              .fontSize(19)
-              .fontWeight(FontWeight.Bolder)
-              .fontColor(this.isEmergency() ? '#FFFFFF' : '#111827')
+              .fontSize(17)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
             Text('RISK')
               .fontSize(8)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : '#64748B')
+              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_MUTED)
           }
           .alignItems(HorizontalAlign.Center)
         }
-        .width(82)
-        .height(82)
+        .width(72)
+        .height(72)
 
         // Right: Estimated Glycemic Readout & Trend
-        Column({ space: 3 }) {
+        Column({ space: 2 }) {
           Text('ESTIMATED GLUCOSE')
-            .fontSize(10)
+            .fontSize(PhoneTheme.FONT_MICRO)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : '#94A3B8')
+            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_TERTIARY)
 
           Row({ space: 4 }) {
             Text(`${this.glucose.toFixed(1)}`)
-              .fontSize(36)
-              .fontWeight(FontWeight.Bolder)
-              .fontColor(this.isEmergency() ? '#FFFFFF' : '#111827')
+              .fontSize(30)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
 
             Text('mmol/L')
-              .fontSize(13)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : '#64748B')
-              .margin({ bottom: 5 })
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_MUTED)
+              .margin({ bottom: 4 })
           }
           .alignItems(VerticalAlign.Bottom)
 
           Row({ space: 4 }) {
             Text(`Trend: ${trendWord(this.riskIndex)}`)
-              .fontSize(11)
+              .fontSize(PhoneTheme.FONT_CAPTION)
               .fontWeight(FontWeight.Medium)
-              .fontColor(this.isEmergency() ? '#FFFFFF' : (this.isWarning() ? '#B45309' : '#15803D'))
-            Text('• Non-invasive inference')
-              .fontSize(10)
-              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.7)' : '#94A3B8')
+              .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT))
           }
         }
         .layoutWeight(1)
@@ -166,29 +161,21 @@ export struct PhoneHeroCard {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
-      .padding({ top: 4, bottom: 4 })
+      .padding({ top: 2, bottom: 2 })
 
       Divider()
-        .color(this.isEmergency() ? 'rgba(255,255,255,0.2)' : '#F1F5F9')
+        .color(this.isEmergency() ? 'rgba(255,255,255,0.2)' : PhoneTheme.BORDER_LIGHT)
         .strokeWidth(1)
 
-      // Reassuring One-Line Status Statement
-      Row({ space: 8 }) {
-        Stack({ alignContent: Alignment.Center }) {
-          Circle({ width: 18, height: 18 })
-            .fill(this.isEmergency() ? '#FFFFFF' : (this.isWarning() ? '#FEF3C7' : '#DCFCE7'))
-          Text(this.isEmergency() ? '!' : '✓')
-            .fontSize(11)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? '#EF4444' : (this.isWarning() ? '#D97706' : '#15803D'))
-        }
-        .width(18)
-        .height(18)
+      // Clean One-Line Status Statement
+      Row({ space: 6 }) {
+        Circle({ width: 6, height: 6 })
+          .fill(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : (this.isWarning() ? PhoneTheme.STATE_WARN : PhoneTheme.STATE_OK))
 
         Text(heroSentence(this.riskIndex))
-          .fontSize(12)
+          .fontSize(PhoneTheme.FONT_BODY)
           .fontWeight(FontWeight.Medium)
-          .fontColor(this.isEmergency() ? '#FFFFFF' : '#334155')
+          .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -199,55 +186,54 @@ export struct PhoneHeroCard {
       // Emergency / Warning Action Buttons
       if (this.isEmergency()) {
         Row({ space: 10 }) {
-          Button('Call Caregiver Now')
-            .fontSize(14)
+          Button("I'm Awake (Disarm)")
+            .fontSize(PhoneTheme.FONT_SUBTITLE)
             .fontWeight(FontWeight.Bold)
-            .height(44)
+            .height(42)
             .layoutWeight(1)
-            .backgroundColor('#FFFFFF')
-            .fontColor('#EF4444')
-            .borderRadius(14)
-            .shadow({ radius: 8, color: 'rgba(0,0,0,0.1)', offsetY: 2 })
-            .onClick(() => {
-              this.onCallNow();
-            })
-
-          Button("I'm With Them")
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .height(44)
-            .layoutWeight(1)
-            .backgroundColor('rgba(255,255,255,0.25)')
-            .fontColor('#FFFFFF')
-            .border({ width: 1.5, color: '#FFFFFF', radius: 14 })
-            .borderRadius(14)
+            .backgroundColor(PhoneTheme.BG_CARD)
+            .fontColor(PhoneTheme.STATE_CRIT)
+            .borderRadius(PhoneTheme.TILE_RADIUS)
+            .shadow({ radius: 6, color: 'rgba(0,0,0,0.1)', offsetY: 2 })
             .onClick(() => {
               this.onMarkWithThem();
+            })
+
+          Button('Call Contact')
+            .fontSize(PhoneTheme.FONT_SUBTITLE)
+            .fontWeight(FontWeight.Bold)
+            .height(42)
+            .layoutWeight(1)
+            .backgroundColor('rgba(255,255,255,0.2)')
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
+            .border({ width: 1.5, color: PhoneTheme.TEXT_ON_DARK, radius: PhoneTheme.TILE_RADIUS })
+            .borderRadius(PhoneTheme.TILE_RADIUS)
+            .onClick(() => {
+              this.onCallNow();
             })
         }
         .width('100%')
         .margin({ top: 2 })
       } else if (this.isWarning()) {
-        Button('Check on Them — Warning Alert')
-          .fontSize(13)
+        Button('Check on Patient — Warning Dip')
+          .fontSize(PhoneTheme.FONT_BODY)
           .fontWeight(FontWeight.Bold)
-          .height(40)
+          .height(38)
           .width('100%')
-          .backgroundColor('#F59E0B')
-          .fontColor('#FFFFFF')
-          .borderRadius(12)
-          .shadow({ radius: 6, color: 'rgba(245,158,11,0.25)', offsetY: 2 })
+          .backgroundColor(PhoneTheme.STATE_WARN)
+          .fontColor(PhoneTheme.TEXT_ON_DARK)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
           .onClick(() => {
             this.onCallNow();
           })
       }
     }
     .width('100%')
-    .padding(18)
+    .padding(PhoneTheme.CARD_PADDING)
     .backgroundColor(this.getCardBg())
     .borderWidth(1)
     .borderColor(this.getBorderColor())
-    .borderRadius(22)
-    .shadow({ radius: 10, color: 'rgba(0, 0, 0, 0.04)', offsetY: 2 })
+    .borderRadius(PhoneTheme.CARD_RADIUS)
+    .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
   }
 }

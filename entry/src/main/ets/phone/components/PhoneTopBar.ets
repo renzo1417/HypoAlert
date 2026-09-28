@@ -1,8 +1,10 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Minimalist Top Header Bar with greeting, wearable battery status, and notifications.
- * Modeled after the reference health monitoring header.
+ * Phone Companion — Minimalist Bedside Status Header.
+ * Clinical-grade status indicator: Watch BLE link, battery, and quick scenario test action.
  */
+
+import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneTopBar {
@@ -11,42 +13,34 @@ export struct PhoneTopBar {
   @Prop isWatchConnected: boolean = true;
   @Prop watchBattery: number = 86;
   @Prop deviceName: string = 'WATCH 4 Pro';
-  @Prop userName: string = 'Maria';
-  onNotificationClick: () => void = () => {};
+  onOpenTest: () => void = () => {};
 
   build() {
     Row() {
-      // Left: Profile Avatar + Friendly Greeting
-      Row({ space: 10 }) {
+      // Left: App Brand & Guardian Status
+      Row({ space: 8 }) {
         Stack({ alignContent: Alignment.Center }) {
-          Circle({ width: 40, height: 40 })
-            .fill(this.isEmergency ? '#FEE2E2' : '#F1F5F9')
-
-          Text(this.userName.length > 0 ? this.userName.substring(0, 1) : 'M')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency ? '#EF4444' : '#1E293B')
+          Circle({ width: 28, height: 28 })
+            .fill(this.isEmergency ? PhoneTheme.STATE_CRIT_BG : PhoneTheme.BRAND_ACCENT_BG)
+          Circle({ width: 8, height: 8 })
+            .fill(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.BRAND_ACCENT)
         }
-        .width(40)
-        .height(40)
+        .width(28)
+        .height(28)
 
         Column({ space: 1 }) {
-          Row({ space: 4 }) {
-            Text(`Hello, ${this.userName}`)
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#111827')
-            Text('👋')
-              .fontSize(14)
-          }
+          Text('HypoAlert')
+            .fontSize(PhoneTheme.FONT_SECTION)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(PhoneTheme.TEXT_PRIMARY)
 
-          Row({ space: 5 }) {
-            Circle({ width: 6, height: 6 })
-              .fill(this.isEmergency ? '#EF4444' : (this.isWatchConnected ? '#22C55E' : '#F59E0B'))
-            Text(this.isEmergency ? 'Emergency Active' : (this.isWatchConnected ? 'Night Guardian Active' : 'Watch Offline'))
-              .fontSize(11)
+          Row({ space: 4 }) {
+            Circle({ width: 5, height: 5 })
+              .fill(this.isEmergency ? PhoneTheme.STATE_CRIT : (this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.STATE_WARN))
+            Text(this.isEmergency ? 'Emergency Alert' : (this.isWatchConnected ? 'Bedside Guardian Active' : 'Watch Offline'))
+              .fontSize(PhoneTheme.FONT_CAPTION)
               .fontWeight(FontWeight.Medium)
-              .fontColor(this.isEmergency ? '#EF4444' : '#64748B')
+              .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_MUTED)
           }
           .alignItems(VerticalAlign.Center)
         }
@@ -55,67 +49,42 @@ export struct PhoneTopBar {
       .alignItems(VerticalAlign.Center)
       .layoutWeight(1)
 
-      // Right: Watch Battery Pill + Notification Bell
+      // Right: Watch Capsule + Scenario Test Button
       Row({ space: 8 }) {
         // Wearable connection capsule
         Row({ space: 5 }) {
-          Circle({ width: 6, height: 6 })
-            .fill(this.isWatchConnected ? '#22C55E' : '#94A3B8')
+          Circle({ width: 5, height: 5 })
+            .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.TEXT_TERTIARY)
 
-          Text(this.isWatchConnected ? `${this.watchBattery}%` : 'Offline')
-            .fontSize(12)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isWatchConnected ? '#111827' : '#94A3B8')
+          Text(this.isWatchConnected ? `${this.deviceName} • ${this.watchBattery}%` : 'Offline')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.isWatchConnected ? PhoneTheme.TEXT_PRIMARY : PhoneTheme.TEXT_TERTIARY)
         }
-        .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-        .backgroundColor('#FFFFFF')
-        .borderRadius(14)
-        .shadow({ radius: 4, color: 'rgba(0, 0, 0, 0.04)', offsetY: 1 })
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderRadius(PhoneTheme.PILL_RADIUS)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
         .alignItems(VerticalAlign.Center)
 
-        // Notification Bell Icon Button
-        Button() {
-          Stack({ alignContent: Alignment.Center }) {
-            // Bell shape
-            Column({ space: 1 }) {
-              Circle({ width: 4, height: 4 })
-                .fill('#475569')
-              Row()
-                .width(14)
-                .height(10)
-                .backgroundColor('#475569')
-                .borderRadius({ topLeft: 7, topRight: 7 })
-              Row()
-                .width(16)
-                .height(2)
-                .backgroundColor('#475569')
-                .borderRadius(1)
-            }
-            .alignItems(HorizontalAlign.Center)
-
-            // Alert indicator dot if emergency
-            if (this.isEmergency) {
-              Circle({ width: 6, height: 6 })
-                .fill('#EF4444')
-                .offset({ x: 6, y: -6 })
-            }
-          }
-          .width(36)
-          .height(36)
-        }
-        .width(36)
-        .height(36)
-        .backgroundColor('#FFFFFF')
-        .borderRadius(18)
-        .shadow({ radius: 4, color: 'rgba(0, 0, 0, 0.04)', offsetY: 1 })
-        .onClick(() => {
-          this.onNotificationClick();
-        })
+        // Scenario Test Button (Discreet clinical test trigger)
+        Button('Test')
+          .fontSize(PhoneTheme.FONT_MICRO)
+          .fontWeight(FontWeight.Bold)
+          .height(28)
+          .padding({ left: 10, right: 10 })
+          .backgroundColor(PhoneTheme.BG_MUTED)
+          .fontColor(PhoneTheme.TEXT_SECONDARY)
+          .borderRadius(PhoneTheme.PILL_RADIUS)
+          .onClick(() => {
+            this.onOpenTest();
+          })
       }
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .padding({ left: 20, right: 20, top: 12, bottom: 10 })
+    .padding({ left: 18, right: 18, top: 12, bottom: 8 })
   }
 }
