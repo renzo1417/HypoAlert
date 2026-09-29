@@ -1,12 +1,14 @@
 /*
  * Copyright (c) 2026 HypoAlert.
  * Phone Companion — Screen 1: Bedside Nocturnal Guardian Monitor.
- * Ultra-clean, distraction-free bedside dashboard designed for nighttime glanceability.
+ * Icon hub: tap a biomarker to open its full detail page.
  */
 
 import { PhoneHeroCard } from '../components/PhoneHeroCard';
-import { PhoneMetricGrid } from '../components/PhoneMetricGrid';
+import { MetricIconButton } from '../components/MetricIconButton';
+import { MetricDetailPage } from './details/MetricDetailPage';
 import { PhoneTheme } from '../utils/PhoneTheme';
+import { tempColor, riskLevel, restlessShort } from '../utils/PhoneRiskUtils';
 
 @Component
 export struct MonitorView {
@@ -27,6 +29,28 @@ export struct MonitorView {
   onMarkWithThem: () => void = () => {};
   onConnectWatch: () => void = () => {};
   onNavigateTab: (index: number) => void = () => {};
+  @State selectedMetric: string = '';
+
+  private getTremorColor(): string {
+    if (this.tremorPSD > 1.0) {
+      return PhoneTheme.STATE_CRIT;
+    }
+    if (this.tremorPSD > 0.4) {
+      return PhoneTheme.STATE_WARN;
+    }
+    return PhoneTheme.STATE_OK;
+  }
+
+  private getPulseColor(): string {
+    const lvl: string = riskLevel(this.riskIndex);
+    if (lvl === 'Critical') {
+      return PhoneTheme.STATE_CRIT;
+    }
+    if (lvl === 'Warning' || this.heartRate > 80) {
+      return PhoneTheme.STATE_WARN;
+    }
+    return PhoneTheme.STATE_OK;
+  }
 
   build() {
     Scroll() {
@@ -70,30 +94,121 @@ export struct MonitorView {
           .alignItems(VerticalAlign.Center)
         }
 
-        // Primary Hero Card: Glycemic state, Risk gauge, and crisis actions
-        PhoneHeroCard({
-          glucose: this.glucose,
-          riskIndex: this.riskIndex,
-          currentTime: this.currentTime,
-          heartRate: this.heartRate,
-          watchBattery: this.watchBattery,
-          bannerFlash: this.bannerFlash,
-          isWatchConnected: this.isWatchConnected,
-          onCallNow: this.onCallNow,
-          onMarkWithThem: this.onMarkWithThem
-        })
+        // Primary Hero Card — hub only, hidden in detail view
+        if (this.selectedMetric.length === 0) {
+          PhoneHeroCard({
+            glucose: this.glucose,
+            riskIndex: this.riskIndex,
+            currentTime: this.currentTime,
+            heartRate: this.heartRate,
+            watchBattery: this.watchBattery,
+            bannerFlash: this.bannerFlash,
+            isWatchConnected: this.isWatchConnected,
+            onCallNow: this.onCallNow,
+            onMarkWithThem: this.onMarkWithThem
+          })
+        }
 
-        // Core Sympathetic Biomarkers (Tremor, Pulse, Temp, Baseline)
-        PhoneMetricGrid({
-          heartRate: this.heartRate,
-          tremorPSD: this.tremorPSD,
-          skinTemp: this.skinTemp,
-          riskIndex: this.riskIndex,
-          ppgContext: this.ppgContext,
-          onCanvasReady: this.onCanvasReady
-        })
+        // Core Sympathetic Biomarkers — icon hub, tap opens full detail page
+        if (this.selectedMetric.length === 0) {
+          Column({ space: 10 }) {
+            Row() {
+              Text('Biomarkers')
+                .fontSize(PhoneTheme.FONT_SECTION)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Blank()
+              Text('Tap icon for detail')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_TERTIARY)
+            }
+            .width('100%')
+            .padding({ left: 2, right: 2 })
+
+            Grid() {
+              GridItem() {
+                MetricIconButton({
+                  title: 'Micro-Tremor',
+                  value: `${this.tremorPSD.toFixed(2)} PSD`,
+                  hint: restlessShort(this.tremorPSD),
+                  statusColor: this.getTremorColor(),
+                  glyph: '≋',
+                  onOpen: () => {
+                    animateTo({ duration: 220, curve: Curve.EaseInOut }, () => {
+                      this.selectedMetric = 'tremor';
+                    });
+                  }
+                })
+              }
+              GridItem() {
+                MetricIconButton({
+                  title: 'Pulse & Tone',
+                  value: `${this.heartRate} bpm`,
+                  hint: 'PPG waveform',
+                  statusColor: this.getPulseColor(),
+                  glyph: '♥',
+                  onOpen: () => {
+                    animateTo({ duration: 220, curve: Curve.EaseInOut }, () => {
+                      this.selectedMetric = 'pulse';
+                    });
+                  }
+                })
+              }
+              GridItem() {
+                MetricIconButton({
+                  title: 'Skin Temp',
+                  value: `${this.skinTemp.toFixed(1)}°C`,
+                  hint: 'Thermal drift',
+                  statusColor: tempColor(this.skinTemp),
+                  glyph: '°',
+                  onOpen: () => {
+                    animateTo({ duration: 220, curve: Curve.EaseInOut }, () => {
+                      this.selectedMetric = 'temp';
+                    });
+                  }
+                })
+              }
+              GridItem() {
+                MetricIconButton({
+                  title: 'Baseline',
+                  value: 'Calibrated',
+                  hint: '45m window',
+                  statusColor: PhoneTheme.BRAND_ACCENT,
+                  glyph: '◉',
+                  onOpen: () => {
+                    animateTo({ duration: 220, curve: Curve.EaseInOut }, () => {
+                      this.selectedMetric = 'baseline';
+                    });
+                  }
+                })
+              }
+            }
+            .columnsTemplate('1fr 1fr')
+            .columnsGap(10)
+            .rowsGap(10)
+            .width('100%')
+            .height(306)
+          }
+          .width('100%')
+        } else {
+          MetricDetailPage({
+            metricId: this.selectedMetric,
+            heartRate: this.heartRate,
+            tremorPSD: this.tremorPSD,
+            skinTemp: this.skinTemp,
+            riskIndex: this.riskIndex,
+            ppgContext: this.ppgContext,
+            onCanvasReady: this.onCanvasReady,
+            onBack: () => {
+              animateTo({ duration: 220, curve: Curve.EaseInOut }, () => {
+                this.selectedMetric = '';
+              });
+            }
+          })
+        }
 
         // Calming Bedside Safeguard Footer Notice
+        if (this.selectedMetric.length === 0) {
         Row({ space: 6 }) {
           Circle({ width: 4, height: 4 }).fill(PhoneTheme.TEXT_TERTIARY)
           Text('Bedside Guardian: Haptic wrist alert sounds loud phone siren if unawakened')
@@ -104,6 +219,7 @@ export struct MonitorView {
         .width('100%')
         .padding({ left: 4, right: 4, top: 4, bottom: 20 })
         .alignItems(VerticalAlign.Center)
+        }
       }
       .width('100%')
       .padding({ left: 18, right: 18, top: 6, bottom: 36 })
