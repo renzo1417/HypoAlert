@@ -210,6 +210,32 @@ export struct PhoneHeroCard {
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
+      if (this.vitals.tcnnEma !== undefined && this.vitals.tcnnThr !== undefined) {
+        Row({ space: 6 }) {
+          Text(`1D-CNN ${this.vitals.tcnnSlotsFilled ?? 12}/12 slots`)
+            .fontSize(PhoneTheme.FONT_MICRO)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_ACCENT)
+
+          Text(`EMA ${this.vitals.tcnnEma.toFixed(2)} vs ${this.vitals.tcnnThr.toFixed(2)}`)
+            .fontSize(PhoneTheme.FONT_MICRO)
+            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_SECONDARY)
+            .layoutWeight(1)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          if (this.vitals.tcnnRawLogit !== undefined) {
+            Text(`z ${this.vitals.tcnnRawLogit.toFixed(2)}`)
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_TERTIARY)
+          }
+        }
+        .width('100%')
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.16)' : PhoneTheme.BG_SUBTLE)
+        .borderRadius(PhoneTheme.TILE_RADIUS)
+      }
+
       if (this.isEmergency()) {
         Row({ space: 10 }) {
           Button("I'm awake")

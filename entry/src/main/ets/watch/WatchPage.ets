@@ -7,9 +7,12 @@ import {
   AlertState,
   BodyPhenotype,
   DetectionPhase,
+  ReplayStepOutput,
   VitalsData,
   VitalsEngine
 } from '../models/VitalsModel';
+import { TcnnNightState } from '../models/TcnnEngine';
+import { LOSO_C2S02_BUNDLE, REPLAY_C2S02_NIGHT } from '../models/TcnnWeights';
 import { HistoryRepository } from '../models/HistoryModel';
 import { AlertService } from '../services/AlertService';
 import { DeviceConnectionManager, ConnectionState, ConnectionListener } from '../services/DeviceConnectionManager';
@@ -39,6 +42,7 @@ export struct WatchPage {
   @State simStatus: string = 'Standby - tap START';
   @State hapticStatus: string = 'Checks 0/3 • Max 2/night';
   @State testToolsOpen: boolean = false;
+  @State replayActive: boolean = false;
   @State editingTime: boolean = false;
   @State editingStart: boolean = true;
   @State editHourIdx: number = 9;
@@ -46,7 +50,10 @@ export struct WatchPage {
   @State editAmpmIdx: number = 1;
 
   private vitalsTimerId: number = -1;
+  private replayTimerId: number = -1;
   private animTimerId: number = -1;
+  private tcnnNight: TcnnNightState = VitalsEngine.createPhase3NightState(BodyPhenotype.ADRENERGIC, true);
+  private replayIndex: number = 0;
   private alertService: AlertService = AlertService.getInstance();
   private connManager: DeviceConnectionManager = DeviceConnectionManager.getInstance();
   private connListener: ConnectionListener | null = null;
@@ -66,7 +73,7 @@ export struct WatchPage {
     });
 
     this.vitalsTimerId = setInterval(() => {
-      if (!this.isMonitoringActive) {
+      if (!this.isMonitoringActive || this.replayActive) {
         return;
       }
       if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
@@ -80,7 +87,8 @@ export struct WatchPage {
             this.phenotype,
             this.activePhase,
             this.getActiveThreshold(),
-            nextBase
+            nextBase,
+            this.tcnnNight
           );
         } else {
           this.vitals = VitalsEngine.generateSteadyVitals(
@@ -90,7 +98,8 @@ export struct WatchPage {
             this.getActiveThreshold(),
             75,
             this.vitals.alertsTonight,
-            this.vitals.cooldownMinutes
+            this.vitals.cooldownMinutes,
+            this.tcnnNight
           );
         }
         this.refreshStatusText();
@@ -108,7 +117,8 @@ export struct WatchPage {
           this.getActiveThreshold(),
           75,
           this.vitals.alertsTonight,
-          nextCd
+          nextCd,
+          this.tcnnNight
         );
         this.refreshStatusText();
       }
@@ -135,6 +145,7 @@ export struct WatchPage {
       clearInterval(this.vitalsTimerId);
       this.vitalsTimerId = -1;
     }
+    this.stopReplay();
     if (this.animTimerId !== -1) {
       clearInterval(this.animTimerId);
       this.animTimerId = -1;
@@ -150,10 +161,13 @@ export struct WatchPage {
     if (this.activePhase === 2) {
       return this.personalThreshold > VitalsEngine.PHASE1_THRESHOLD ? this.personalThreshold : 5.44;
     }
-    return 3.7;
+    return this.phenotype === BodyPhenotype.BRADYCARDIC ? -2.62 : -1.48;
   }
 
   private buildGuardText(): string {
+    if (this.replayActive && this.vitals.tcnnEma !== undefined && this.vitals.tcnnThr !== undefined) {
+      return `EMA ${this.vitals.tcnnEma.toFixed(2)} vs ${this.vitals.tcnnThr.toFixed(2)} • ${this.vitals.streakCount}/${this.vitals.streakRequired}`;
+    }
     if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
       return 'Alerts start after 75m';
     }
@@ -166,6 +180,9 @@ export struct WatchPage {
     if (this.vitals.cooldownMinutes > 0) {
       return `Cooldown ${this.vitals.cooldownMinutes}m • ${this.vitals.alertsTonight}/2 alerts`;
     }
+    if (this.activePhase === 3 && this.vitals.tcnnEma !== undefined && this.vitals.tcnnThr !== undefined) {
+      return `CNN ${this.vitals.tcnnEma.toFixed(2)}/${this.vitals.tcnnThr.toFixed(2)} • ${this.vitals.streakCount}/${this.vitals.streakRequired}`;
+    }
     return `Checks ${this.vitals.streakCount}/${this.vitals.streakRequired} • ${this.vitals.alertsTonight}/2 alerts`;
   }
 
@@ -175,23 +192,38 @@ export struct WatchPage {
       this.hapticStatus = `Checks 0/${VitalsEngine.getStreakRequired(this.phenotype)} • Max 2/night`;
       return;
     }
-    if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+    if (this.replayActive) {
+      this.simStatus = `P3 Replay • ${this.vitals.replayLabel ?? 'c2s02_7'}`;
+    } else if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
       this.simStatus = `${VitalsEngine.getPhaseShort(this.activePhase)} • Learning sleep`;
+    } else if (this.activePhase === 3) {
+      this.simStatus = `P3 1D-CNN • ${this.vitals.tcnnSlotsFilled ?? 12}/12`;
     } else {
       this.simStatus = `${VitalsEngine.getPhaseShort(this.activePhase)} • Base OK`;
     }
     this.hapticStatus = this.buildGuardText();
   }
 
+  private stopReplay(): void {
+    this.replayActive = false;
+    if (this.replayTimerId !== -1) {
+      clearInterval(this.replayTimerId);
+      this.replayTimerId = -1;
+    }
+  }
+
   private syncVitalsIdle(): void {
-    this.vitals = VitalsEngine.createInitialVitals(this.phenotype, this.activePhase, this.getActiveThreshold());
+    this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, true);
+    this.vitals = VitalsEngine.createInitialVitals(this.phenotype, this.activePhase, this.getActiveThreshold(), this.tcnnNight);
     this.refreshStatusText();
   }
 
   private toggleMonitoring(): void {
+    this.stopReplay();
     this.isMonitoringActive = !this.isMonitoringActive;
     if (this.isMonitoringActive) {
       this.currentAlertState = AlertState.MONITORING;
+      this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, true);
       this.vitals = VitalsEngine.generateSteadyVitals(
         undefined,
         this.phenotype,
@@ -199,12 +231,14 @@ export struct WatchPage {
         this.getActiveThreshold(),
         75,
         0,
-        0
+        0,
+        this.tcnnNight
       );
     } else {
       this.alertService.stopEmergencyAlert();
       this.currentAlertState = AlertState.MONITORING;
-      this.vitals = VitalsEngine.createInitialVitals(this.phenotype, this.activePhase, this.getActiveThreshold());
+      this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, true);
+      this.vitals = VitalsEngine.createInitialVitals(this.phenotype, this.activePhase, this.getActiveThreshold(), this.tcnnNight);
     }
     this.refreshStatusText();
   }
@@ -213,13 +247,15 @@ export struct WatchPage {
     if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
       return;
     }
+    this.stopReplay();
     this.isMonitoringActive = true;
     this.vitals = VitalsEngine.generateElevatedStep(
       this.vitals,
       this.phenotype,
       this.activePhase,
       this.getActiveThreshold(),
-      false
+      false,
+      this.tcnnNight
     );
     if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
       this.activateAlertFromVitals();
@@ -232,19 +268,74 @@ export struct WatchPage {
     if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
       return;
     }
+    this.stopReplay();
     this.isMonitoringActive = true;
     this.vitals = VitalsEngine.generateElevatedStep(
       this.vitals,
       this.phenotype,
       this.activePhase,
       this.getActiveThreshold(),
-      true
+      true,
+      this.tcnnNight
     );
     if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
       this.activateAlertFromVitals();
     } else {
       this.refreshStatusText();
     }
+  }
+
+  private toggleReplayReal(): void {
+    if (this.replayActive) {
+      this.stopReplay();
+      this.refreshStatusText();
+      return;
+    }
+    this.alertService.stopEmergencyAlert();
+    this.currentAlertState = AlertState.MONITORING;
+    this.isMonitoringActive = true;
+    this.activePhase = 3;
+    this.phenotype = BodyPhenotype.ADRENERGIC;
+    this.replayIndex = 0;
+    this.replayActive = true;
+
+    let alertsCount: number = 0;
+    let cooldownMin: number = 0;
+    let streak: number = 0;
+
+    const runOneFrame = (): void => {
+      if (!this.replayActive || this.replayIndex >= REPLAY_C2S02_NIGHT.framesZ.length) {
+        this.stopReplay();
+        this.refreshStatusText();
+        return;
+      }
+      const out: ReplayStepOutput = VitalsEngine.replayStepFromNight(
+        REPLAY_C2S02_NIGHT,
+        LOSO_C2S02_BUNDLE,
+        this.tcnnNight,
+        this.replayIndex,
+        alertsCount,
+        cooldownMin,
+        streak
+      );
+      this.vitals = out.vitals;
+      streak = out.stepResult.isHot ? streak + 1 : 0;
+      cooldownMin = out.vitals.cooldownMinutes;
+      this.replayIndex += 1;
+
+      if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+        this.stopReplay();
+        this.activateAlertFromVitals();
+      } else {
+        this.refreshStatusText();
+      }
+    };
+
+    runOneFrame();
+    this.goToPage(0);
+    this.replayTimerId = setInterval(() => {
+      runOneFrame();
+    }, 650);
   }
 
   private activateAlertFromVitals(): void {
@@ -263,6 +354,7 @@ export struct WatchPage {
   }
 
   private toggleMotionGate(): void {
+    this.stopReplay();
     this.isMonitoringActive = true;
     this.currentAlertState = AlertState.MONITORING;
     if (this.vitals.isSedentary) {
@@ -270,7 +362,8 @@ export struct WatchPage {
         this.vitals,
         this.phenotype,
         this.activePhase,
-        this.getActiveThreshold()
+        this.getActiveThreshold(),
+        this.tcnnNight
       );
     } else {
       this.vitals = VitalsEngine.generateSteadyVitals(
@@ -280,29 +373,38 @@ export struct WatchPage {
         this.getActiveThreshold(),
         75,
         this.vitals.alertsTonight,
-        this.vitals.cooldownMinutes
+        this.vitals.cooldownMinutes,
+        this.tcnnNight
       );
     }
     this.refreshStatusText();
   }
 
   private startBaselineWarmup(): void {
+    this.stopReplay();
     this.isMonitoringActive = true;
     this.currentAlertState = AlertState.MONITORING;
+    this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, false);
     this.vitals = VitalsEngine.generateBaselineVitals(
       this.vitals,
       this.phenotype,
       this.activePhase,
       this.getActiveThreshold(),
-      35
+      35,
+      this.tcnnNight
     );
     this.refreshStatusText();
   }
 
   private togglePhenotype(): void {
+    this.stopReplay();
     this.phenotype = this.phenotype === BodyPhenotype.ADRENERGIC
       ? BodyPhenotype.BRADYCARDIC
       : BodyPhenotype.ADRENERGIC;
+    this.tcnnNight = VitalsEngine.createPhase3NightState(
+      this.phenotype,
+      this.vitals.baselineMinutes >= VitalsEngine.BASELINE_TOTAL_MINUTES
+    );
     this.vitals = VitalsEngine.generateSteadyVitals(
       this.vitals,
       this.phenotype,
@@ -310,13 +412,19 @@ export struct WatchPage {
       this.getActiveThreshold(),
       this.vitals.baselineMinutes,
       this.vitals.alertsTonight,
-      this.vitals.cooldownMinutes
+      this.vitals.cooldownMinutes,
+      this.tcnnNight
     );
     this.refreshStatusText();
   }
 
   private cyclePhase(): void {
+    this.stopReplay();
     this.activePhase = this.activePhase === 1 ? 2 : (this.activePhase === 2 ? 3 : 1);
+    this.tcnnNight = VitalsEngine.createPhase3NightState(
+      this.phenotype,
+      this.vitals.baselineMinutes >= VitalsEngine.BASELINE_TOTAL_MINUTES
+    );
     this.vitals = VitalsEngine.generateSteadyVitals(
       this.vitals,
       this.phenotype,
@@ -324,12 +432,14 @@ export struct WatchPage {
       this.getActiveThreshold(),
       this.vitals.baselineMinutes,
       this.vitals.alertsTonight,
-      this.vitals.cooldownMinutes
+      this.vitals.cooldownMinutes,
+      this.tcnnNight
     );
     this.refreshStatusText();
   }
 
   private dismissAlert(): void {
+    this.stopReplay();
     this.alertService.stopEmergencyAlert();
     this.currentAlertState = AlertState.MONITORING;
     HistoryRepository.updateTonightResolved();
@@ -340,7 +450,8 @@ export struct WatchPage {
       this.getActiveThreshold(),
       75,
       this.vitals.alertsTonight,
-      VitalsEngine.COOLDOWN_MINUTES
+      VitalsEngine.COOLDOWN_MINUTES,
+      this.tcnnNight
     );
     this.refreshStatusText();
     this.goToPage(0);
@@ -432,6 +543,7 @@ export struct WatchPage {
             isPhoneConnected: this.isPhoneConnected,
             phenotype: this.phenotype,
             activePhase: this.activePhase,
+            replayActive: this.replayActive,
             scheduleStartTime: this.scheduleStartTime,
             scheduleEndTime: this.scheduleEndTime,
             currentPage: this.currentPage,
@@ -449,6 +561,9 @@ export struct WatchPage {
             },
             onStartBaseline: () => {
               this.startBaselineWarmup();
+            },
+            onReplayReal: () => {
+              this.toggleReplayReal();
             },
             onTogglePhenotype: () => {
               this.togglePhenotype();

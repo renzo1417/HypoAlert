@@ -105,6 +105,24 @@
           </div>
         </div>
 
+        <div class="control-group replay-group">
+          <span class="control-label">Phase 3 Real 1D-CNN Night Replay (Strict Held-Out LOSO)</span>
+          <div class="seg-row" role="group" aria-label="Real held-out patient night">
+            <button type="button" id="rp-c2s02" class="seg-btn" aria-pressed="false">c2s02_7 (Adren.)</button>
+            <button type="button" id="rp-c2s03" class="seg-btn" aria-pressed="false">c2s03_3 (Blunted)</button>
+            <button type="button" id="rp-c1s05" class="seg-btn" aria-pressed="false">c1s05_7 (Normal)</button>
+          </div>
+          <div class="replay-actions">
+            <button type="button" id="rp-step" class="sc-btn">+5m Frame</button>
+            <button type="button" id="rp-play" class="sc-btn sc-accent">Auto-Play</button>
+            <button type="button" id="rp-stop" class="sc-btn">Stop</button>
+          </div>
+          <label class="replay-cgm-toggle" for="rp-show-cgm">
+            <input id="rp-show-cgm" type="checkbox">
+            <span>Show hidden reference CGM (test verification only)</span>
+          </label>
+        </div>
+
         <div class="control-footer">
           <button type="button" id="sc-reset-night" class="btn-outline-sm">Reset Night (0/2 Alerts)</button>
         </div>
@@ -154,6 +172,23 @@
                 <span class="pill" id="hh-streak-pill">Checks: 0/3</span>
                 <span class="pill" id="hh-cap-pill">Alerts: 0/2 tonight</span>
                 <span class="pill" id="hh-reason-pill">Within baseline</span>
+              </div>
+            </div>
+
+            <!-- Phase 3 Live 1D-CNN Telemetry & Optional Replay Verification Box -->
+            <div id="hh-tcnn-box" class="tcnn-telemetry-box" hidden>
+              <div class="tcnn-box-head">
+                <strong>DualHead 1D-CNN (498 params • L=12 / 60m)</strong>
+                <span id="hh-tcnn-slots" class="badge-pill info">12/12 slots</span>
+              </div>
+              <div class="tcnn-metrics">
+                <div><span>Raw Logit</span><b id="hh-tcnn-raw">—</b></div>
+                <div><span>Calibrated EMA</span><b id="hh-tcnn-ema">—</b></div>
+                <div><span>97% Cutoff</span><b id="hh-tcnn-thr">—</b></div>
+                <div><span>PyTorch Match</span><b id="hh-tcnn-diff">Cohort live</b></div>
+              </div>
+              <div id="hh-replay-cgm-row" class="tcnn-cgm-ref" hidden>
+                Hidden Reference CGM (Test Only): <strong id="hh-replay-cgm">—</strong>
               </div>
             </div>
 
@@ -344,6 +379,7 @@
     </section>
   </main>
 
+  <script src="tcnn-bundle.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -14,6 +14,7 @@ export struct WatchSettingsView {
   @Prop isPhoneConnected: boolean = true;
   @Prop phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
   @Prop activePhase: DetectionPhase = 1;
+  @Prop replayActive: boolean = false;
   @Prop scheduleStartTime: string = '22:00';
   @Prop scheduleEndTime: string = '06:00';
   @Prop currentPage: number = 2;
@@ -22,6 +23,7 @@ export struct WatchSettingsView {
   onTriggerCrisis: () => void = () => {};
   onToggleMotion: () => void = () => {};
   onStartBaseline: () => void = () => {};
+  onReplayReal: () => void = () => {};
   onTogglePhenotype: () => void = () => {};
   onCyclePhase: () => void = () => {};
   onOpenTimeEdit: (isStart: boolean) => void = () => {};
@@ -215,6 +217,17 @@ export struct WatchSettingsView {
                 })
             }
             .width('100%')
+
+            Button(this.replayActive ? 'Stop c2s02 Replay' : 'Replay c2s02 (1D-CNN)')
+              .fontSize(9)
+              .height(26)
+              .width('100%')
+              .backgroundColor('#132B33')
+              .fontColor('#00E5FF')
+              .borderRadius(13)
+              .onClick(() => {
+                this.onReplayReal();
+              })
           }
         }
         .width('100%')

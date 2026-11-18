@@ -17,6 +17,7 @@ export struct DemoSheet {
   onSimulateStepCheck: () => void = () => {};
   onSimulateSurge: () => void = () => {};
   onSimulateMoving: () => void = () => {};
+  onSimulateReplayC2s02: () => void = () => {};
   onTogglePhenotype: () => void = () => {};
   onCyclePhase: () => void = () => {};
   onToggleWatchConnection: () => void = () => {};
@@ -216,6 +217,32 @@ export struct DemoSheet {
         .borderRadius(PhoneTheme.TILE_RADIUS)
         .onClick(() => {
           this.onSimulateSurge();
+          this.onClose();
+        })
+
+        Button() {
+          Row({ space: 10 }) {
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.BRAND_ACCENT)
+            Text('Replay Real c2s02_7 (Phase 3 1D-CNN)')
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
+            Text('Real Data')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.BRAND_ACCENT)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(11)
+        .backgroundColor(PhoneTheme.BRAND_ACCENT_BG)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BRAND_ACCENT)
+        .borderRadius(PhoneTheme.TILE_RADIUS)
+        .onClick(() => {
+          this.onSimulateReplayC2s02();
           this.onClose();
         })
       }

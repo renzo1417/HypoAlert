@@ -1052,3 +1052,100 @@ input[type="checkbox"][switch].switch-fallback:checked::after {
     transition: none !important;
   }
 }
+
+/* Phase 3 Real 1D-CNN Replay & Live Telemetry */
+.replay-group {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.replay-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sc-btn.sc-accent {
+  border-color: var(--huawei-blue);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.replay-cgm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  min-height: 36px;
+  font-size: 0.76rem;
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+
+.replay-cgm-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--huawei-blue);
+  cursor: pointer;
+}
+
+.tcnn-telemetry-box {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+}
+
+.tcnn-telemetry-box[hidden],
+.tcnn-cgm-ref[hidden] {
+  display: none;
+}
+
+.tcnn-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-primary);
+  margin-bottom: 8px;
+}
+
+.tcnn-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.tcnn-metrics > div {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px;
+  text-align: center;
+}
+
+.tcnn-metrics span {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--ink-muted);
+}
+
+.tcnn-metrics b {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--ink-primary);
+  margin-top: 2px;
+}
+
+.tcnn-cgm-ref {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.74rem;
+}
