@@ -1,312 +1,522 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Screen 2: Overnight Symptom Risk History & Finger-Prick Verification Trail.
+ * Phone Companion — Screen 2: Night History & Nocturnal Time Ruler.
+ * Bound directly to HistoryModel NightHistoryRecord & GateProgress (7676da5).
  */
 
+import { ActionTakenEntry, HistoryRepository, NightHistoryRecord } from '../../models/HistoryModel';
 import { VitalsData, VitalsEngine } from '../../models/VitalsModel';
-import { NightHistoryRecord, ActionTakenEntry, HistoryRepository } from '../../models/HistoryModel';
-import { getOvernightBarColor } from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct TrendsView {
   @Prop vitals: VitalsData = VitalsEngine.createInitialVitals();
-  @Prop currentTime: string = '00:00:00';
-  @Prop historyVersion: number = 0;
+  @Prop @Watch('onHistoryVersionChange') historyVersion: number = 0;
 
   @State selectedIndex: number = 0;
+  @State selectedSlot: number = 2; // 0: 12am, 1: 2am, 2: 4am, 3: 6am, 4: 8am
+  @State searchText: string = '';
+  @State filterMode: string = 'all'; // 'all' | 'alerts' | 'pricks'
   @State historyRecords: NightHistoryRecord[] = [];
+  onOpenReports: () => void = () => {};
 
   aboutToAppear(): void {
-    this.historyRecords = HistoryRepository.getHistory();
+    this.historyRecords = [...HistoryRepository.getHistory()];
   }
 
-  private getSelectedRecord(): NightHistoryRecord {
-    const records: NightHistoryRecord[] = HistoryRepository.getHistory();
-    if (this.selectedIndex >= 0 && this.selectedIndex < records.length) {
-      const rec: NightHistoryRecord = records[this.selectedIndex];
-      if (this.selectedIndex === 0) {
-        rec.peakRiskPct = Math.max(rec.peakRiskPct, this.vitals.symptomRiskPct);
-        rec.episodesCount = Math.max(rec.episodesCount, this.vitals.alertsTonight);
-        if (this.vitals.statusTier === 'ALERT') {
-          rec.status = 'CRITICAL';
-        } else if (this.vitals.statusTier === 'WATCH' && rec.status === 'NORMAL') {
-          rec.status = 'WARNING';
-        }
+  onHistoryVersionChange(): void {
+    this.historyRecords = [...HistoryRepository.getHistory()];
+  }
+
+  private records(): NightHistoryRecord[] {
+    if (this.historyRecords.length > 0) {
+      return this.historyRecords;
+    }
+    return HistoryRepository.getHistory();
+  }
+
+  private selectedRecord(): NightHistoryRecord {
+    const list: NightHistoryRecord[] = this.records();
+    if (this.selectedIndex >= 0 && this.selectedIndex < list.length) {
+      return list[this.selectedIndex];
+    }
+    return list[0];
+  }
+
+  private selectedWindowRisk(): number {
+    const rec: NightHistoryRecord = this.selectedRecord();
+    if (this.selectedSlot >= 0 && this.selectedSlot < rec.hourlyRiskPct.length) {
+      if (this.selectedIndex === 0 && this.selectedSlot === 2 && this.vitals.statusTier === 'ALERT') {
+        return Math.max(rec.hourlyRiskPct[2], this.vitals.symptomRiskPct);
       }
-      return rec;
+      return rec.hourlyRiskPct[this.selectedSlot];
     }
-    return records[0];
+    return rec.peakRiskPct;
   }
 
-  private getStatusColor(status: string): string {
-    if (status === 'CRITICAL') {
-      return PhoneTheme.STATE_CRIT;
+  private windowLabel(slot: number): string {
+    if (slot === 0) {
+      return '12:00 AM';
     }
-    if (status === 'WARNING') {
-      return PhoneTheme.STATE_WARN;
+    if (slot === 1) {
+      return '02:00 AM';
     }
-    return PhoneTheme.STATE_OK;
+    if (slot === 2) {
+      return '04:00 AM';
+    }
+    if (slot === 3) {
+      return '06:00 AM';
+    }
+    return '08:00 AM';
   }
 
-  private getStatusBg(status: string): string {
-    if (status === 'CRITICAL') {
-      return PhoneTheme.STATE_CRIT_BG;
-    }
-    if (status === 'WARNING') {
-      return PhoneTheme.STATE_WARN_BG;
-    }
-    return PhoneTheme.STATE_OK_BG;
-  }
-
-  private getStatusText(status: string): string {
-    if (status === 'CRITICAL') {
-      return PhoneTheme.STATE_CRIT_TEXT;
-    }
-    if (status === 'WARNING') {
-      return PhoneTheme.STATE_WARN_TEXT;
-    }
-    return PhoneTheme.STATE_OK_TEXT;
-  }
-
-  private getPrickDisplay(rec: NightHistoryRecord): string {
+  private prickDisplay(rec: NightHistoryRecord): string {
     if (rec.fingerPrickMgDl !== undefined) {
       return `${rec.fingerPrickMgDl} mg/dL`;
     }
-    return rec.fingerPrickVerdict;
+    if (rec.fingerPrickVerdict === 'Fine Night') {
+      return 'Fine';
+    }
+    if (rec.fingerPrickVerdict === 'Pending Check') {
+      return 'Pending';
+    }
+    return '—';
+  }
+
+  private filteredActions(): ActionTakenEntry[] {
+    const all: ActionTakenEntry[] = this.selectedRecord().actionsTaken;
+    const q: string = this.searchText.trim().toLowerCase();
+    const out: ActionTakenEntry[] = [];
+    for (let i: number = 0; i < all.length; i++) {
+      const a: ActionTakenEntry = all[i];
+      if (this.filterMode === 'alerts' && a.type !== 'haptic' && a.type !== 'alarm' && a.type !== 'sms' && a.type !== 'call') {
+        continue;
+      }
+      if (this.filterMode === 'pricks' && a.type !== 'prick') {
+        continue;
+      }
+      if (q.length > 0) {
+        const hay: string = `${a.title} ${a.detail} ${a.time}`.toLowerCase();
+        if (hay.indexOf(q) === -1) {
+          continue;
+        }
+      }
+      out.push(a);
+    }
+    return out;
+  }
+
+  private cycleFilter(): void {
+    if (this.filterMode === 'all') {
+      this.filterMode = 'alerts';
+    } else if (this.filterMode === 'alerts') {
+      this.filterMode = 'pricks';
+    } else {
+      this.filterMode = 'all';
+    }
+  }
+
+  private statusLabel(status: string): string {
+    if (status === 'CRITICAL') {
+      return 'Surge';
+    }
+    if (status === 'WARNING') {
+      return 'Rising';
+    }
+    return 'Normal';
+  }
+
+  private tickIndices(): number[] {
+    return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  }
+
+  private tickHeight(i: number): number {
+    if (i % 5 === 0) {
+      return 24;
+    }
+    if (i % 2 === 0) {
+      return 16;
+    }
+    return 10;
+  }
+
+  private tickColor(i: number): string {
+    const center: number = this.selectedSlot * 5;
+    if (Math.abs(i - center) <= 1) {
+      return PhoneTheme.BRAND_ACCENT;
+    }
+    if (i % 5 === 0) {
+      return PhoneTheme.TEXT_PRIMARY;
+    }
+    return PhoneTheme.TEXT_TERTIARY;
   }
 
   build() {
     Scroll() {
-      Column({ space: 12 }) {
-        Column({ space: 2 }) {
-          Row() {
-            Text('Overnight History')
-              .fontSize(PhoneTheme.FONT_TITLE)
-              .fontWeight(FontWeight.Bold)
+      Column({ space: 14 }) {
+        // Header row: History + white Calendar icon button
+        Row() {
+          Text('History')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .letterSpacing(-0.5)
+            .fontColor(PhoneTheme.TEXT_PRIMARY)
+            .layoutWeight(1)
+
+          Button() {
+            SymbolGlyph($r('sys.symbol.calendar'))
+              .fontSize(18)
+              .fontColor([PhoneTheme.TEXT_PRIMARY])
+          }
+          .width(42)
+          .height(42)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderRadius(21)
+          .shadow({ radius: 10, color: 'rgba(17, 19, 24, 0.05)', offsetY: 2 })
+          .onClick(() => {
+            this.selectedIndex = 0;
+            this.filterMode = 'all';
+            this.searchText = '';
+          })
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+
+        // Pill Search Bar + Black Filter Button
+        Row({ space: 8 }) {
+          Row({ space: 8 }) {
+            SymbolGlyph($r('sys.symbol.magnifyingglass'))
+              .fontSize(16)
+              .fontColor([PhoneTheme.TEXT_MUTED])
+
+            TextInput({
+              placeholder: this.filterMode === 'all' ? 'Search logs...' : `Filter: ${this.filterMode}`,
+              text: this.searchText
+            })
+              .fontSize(PhoneTheme.FONT_BODY)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .placeholderColor(PhoneTheme.TEXT_MUTED)
+              .backgroundColor(Color.Transparent)
+              .height(38)
+              .padding(0)
+              .layoutWeight(1)
+              .onChange((val: string) => {
+                this.searchText = val;
+              })
+
+            Button() {
+              SymbolGlyph($r('sys.symbol.slider_horizontal_2'))
+                .fontSize(16)
+                .fontColor([PhoneTheme.TEXT_ON_DARK])
+            }
+            .width(38)
+            .height(38)
+            .backgroundColor(this.filterMode === 'all' ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BRAND_ACCENT)
+            .borderRadius(19)
+            .onClick(() => {
+              this.cycleFilter();
+            })
+          }
+          .width('100%')
+          .height(48)
+          .padding({ left: 16, right: 5 })
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderRadius(24)
+          .shadow({ radius: 10, color: 'rgba(17, 19, 24, 0.04)', offsetY: 2 })
+          .alignItems(VerticalAlign.Center)
+        }
+        .width('100%')
+
+        // Combined Date + Time Ruler White Card
+        Column({ space: 14 }) {
+          Row() {
+            Text('Select Night')
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(PhoneTheme.TEXT_SECONDARY)
               .layoutWeight(1)
 
-            Text('12am–8am')
+            Row({ space: 10 }) {
+              SymbolGlyph($r('sys.symbol.chevron_left'))
+                .fontSize(13)
+                .fontColor([PhoneTheme.TEXT_SECONDARY])
+                .onClick(() => {
+                  const list: NightHistoryRecord[] = this.records();
+                  this.selectedIndex = Math.min(list.length - 1, this.selectedIndex + 1);
+                })
+
+              Text('Sep 2026')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(13)
+                .fontColor([PhoneTheme.TEXT_SECONDARY])
+                .onClick(() => {
+                  this.selectedIndex = Math.max(0, this.selectedIndex - 1);
+                })
+            }
+            .alignItems(VerticalAlign.Center)
+          }
+          .width('100%')
+
+          // Horizontal Date Cards
+          Scroll() {
+            Row({ space: 8 }) {
+              ForEach(this.records(), (rec: NightHistoryRecord, idx: number) => {
+                Button() {
+                  Column({ space: 3 }) {
+                    Text(rec.dateShort)
+                      .fontSize(PhoneTheme.FONT_SUBTITLE)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(this.selectedIndex === idx ? PhoneTheme.TEXT_PRIMARY : PhoneTheme.TEXT_SECONDARY)
+
+                    Text(rec.dayOfWeek)
+                      .fontSize(PhoneTheme.FONT_MICRO)
+                      .fontColor(this.selectedIndex === idx ? PhoneTheme.TEXT_SECONDARY : PhoneTheme.TEXT_MUTED)
+                  }
+                  .alignItems(HorizontalAlign.Center)
+                }
+                .width(74)
+                .height(62)
+                .backgroundColor(this.selectedIndex === idx ? PhoneTheme.BG_CARD : PhoneTheme.BG_INSET)
+                .borderRadius(16)
+                .shadow(this.selectedIndex === idx ? { radius: 10, color: 'rgba(17, 19, 24, 0.08)', offsetY: 2 } : { radius: 0, color: Color.Transparent })
+                .onClick(() => {
+                  this.selectedIndex = idx;
+                })
+              }, (rec: NightHistoryRecord, idx: number) => `${rec.id}_${idx}_${this.selectedIndex === idx}`)
+            }
+            .padding({ left: 2, right: 2 })
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .width('100%')
+
+          // Select Time Window Tick Ruler
+          Column({ space: 8 }) {
+            Row() {
+              Text('Select Window')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .layoutWeight(1)
+
+              Text(`${this.windowLabel(this.selectedSlot)} · ${this.selectedWindowRisk()}%`)
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontWeight(FontWeight.Bold)
+                .fontFeature('"tnum" on')
+                .fontColor(this.selectedWindowRisk() >= 70 ? PhoneTheme.STATE_CRIT_TEXT : PhoneTheme.BRAND_ACCENT)
+            }
+            .width('100%')
+
+            // Vertical tick bars matching reference ruler
+            Row({ space: 0 }) {
+              ForEach(this.tickIndices(), (t: number) => {
+                Column() {
+                  Row()
+                    .width(2.5)
+                    .height(this.tickHeight(t))
+                    .backgroundColor(this.tickColor(t))
+                    .borderRadius(1.5)
+                }
+                .layoutWeight(1)
+                .height(28)
+                .justifyContent(FlexAlign.Center)
+                .onClick(() => {
+                  this.selectedSlot = Math.min(4, Math.round(t / 5));
+                })
+              }, (t: number) => `tick_${t}_${this.selectedSlot}`)
+            }
+            .width('100%')
+
+            // Interactive Time Labels
+            Row() {
+              ForEach([0, 1, 2, 3, 4], (slot: number) => {
+                Text(slot === 0 ? '12am' : (slot === 1 ? '2am' : (slot === 2 ? '4am' : (slot === 3 ? '6am' : '8am'))))
+                  .fontSize(PhoneTheme.FONT_MICRO)
+                  .fontWeight(this.selectedSlot === slot ? FontWeight.Bold : FontWeight.Normal)
+                  .fontColor(this.selectedSlot === slot ? PhoneTheme.BRAND_ACCENT : PhoneTheme.TEXT_MUTED)
+                  .layoutWeight(1)
+                  .textAlign(TextAlign.Center)
+                  .onClick(() => {
+                    this.selectedSlot = slot;
+                  })
+              })
+            }
+            .width('100%')
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+        .shadow({ radius: 12, color: 'rgba(17, 19, 24, 0.04)', offsetY: 3 })
+
+        // Night Summary Section (3 mini cards + log rows)
+        Row() {
+          Text('Night Summary')
+            .fontSize(PhoneTheme.FONT_SECTION)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(PhoneTheme.TEXT_PRIMARY)
+            .layoutWeight(1)
+
+          Button('Reports')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontWeight(FontWeight.Medium)
+            .height(28)
+            .padding({ left: 10, right: 10 })
+            .backgroundColor(PhoneTheme.BG_CARD)
+            .fontColor(PhoneTheme.BRAND_ACCENT)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
+            .onClick(() => {
+              this.onOpenReports();
+            })
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+
+        // 3 Mini Summary Cards
+        Row({ space: 10 }) {
+          // Peak Score
+          Column({ space: 6 }) {
+            Row() {
+              Blank()
+              Circle({ width: 10, height: 10 })
+                .fill(this.selectedRecord().peakRiskPct >= 70 ? PhoneTheme.STATE_CRIT : PhoneTheme.STATE_OK)
+            }
+            .width('100%')
+
+            Row({ space: 3 }) {
+              Text(`${this.selectedRecord().peakScore.toFixed(1)}`)
+                .fontSize(20)
+                .fontWeight(FontWeight.Bold)
+                .fontFeature('"tnum" on')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Text('max')
+                .fontSize(PhoneTheme.FONT_MICRO)
+                .fontColor(PhoneTheme.TEXT_MUTED)
+                .margin({ bottom: 2 })
+            }
+            .alignItems(VerticalAlign.Bottom)
+
+            Text('Peak')
               .fontSize(PhoneTheme.FONT_CAPTION)
               .fontColor(PhoneTheme.TEXT_MUTED)
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
-          Text(`Peak symptom risk ${this.getSelectedRecord().peakRiskPct}% • Max 2 alerts/night`)
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_MUTED)
+          .layoutWeight(1)
+          .padding(12)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderRadius(18)
+          .shadow({ radius: 8, color: 'rgba(17, 19, 24, 0.04)', offsetY: 2 })
+          .alignItems(HorizontalAlign.Start)
+
+          // Streak Alerts
+          Column({ space: 6 }) {
+            Row() {
+              Blank()
+              SymbolGlyph($r('sys.symbol.bell_fill'))
+                .fontSize(12)
+                .fontColor([this.selectedRecord().episodesCount > 0 ? PhoneTheme.STATE_WARN : PhoneTheme.TEXT_TERTIARY])
+            }
             .width('100%')
-        }
-        .width('100%')
-        .padding({ left: 2, right: 2, top: 2 })
 
-        // Night Selector Carousel
-        Scroll() {
-          Row({ space: 6 }) {
-            ForEach(this.historyRecords, (rec: NightHistoryRecord, idx: number) => {
-              Button() {
-                Row({ space: 5 }) {
-                  Circle({ width: 5, height: 5 })
-                    .fill(this.getStatusColor(rec.status))
-
-                  Text(rec.dateShort)
-                    .fontSize(PhoneTheme.FONT_BODY)
-                    .fontWeight(this.selectedIndex === idx ? FontWeight.Bold : FontWeight.Medium)
-                    .fontColor(this.selectedIndex === idx ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
-                }
-                .alignItems(VerticalAlign.Center)
-              }
-              .height(30)
-              .padding({ left: 10, right: 10 })
-              .backgroundColor(this.selectedIndex === idx ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_CARD)
-              .borderRadius(PhoneTheme.PILL_RADIUS)
-              .borderWidth(1)
-              .borderColor(this.selectedIndex === idx ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BORDER_SUBTLE)
-              .onClick(() => {
-                this.selectedIndex = idx;
-              })
-            })
-          }
-          .padding({ left: 2, right: 2, top: 1, bottom: 1 })
-        }
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .width('100%')
-
-        // Selected Night Summary Card
-        Column({ space: 12 }) {
-          Row() {
-            Text(this.getSelectedRecord().dateLabel)
-              .fontSize(PhoneTheme.FONT_SECTION)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-              .layoutWeight(1)
-
-            Text(this.getSelectedRecord().status === 'CRITICAL' ? 'ALERT FIRED' : (this.getSelectedRecord().status === 'WARNING' ? 'SPIKE IGNORED' : 'CALM'))
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.getStatusText(this.getSelectedRecord().status))
-              .backgroundColor(this.getStatusBg(this.getSelectedRecord().status))
-              .borderRadius(PhoneTheme.PILL_RADIUS)
-              .padding({ left: 7, right: 7, top: 2, bottom: 2 })
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
-
-          Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
-
-          Row() {
-            Column({ space: 2 }) {
-              Text('PEAK RISK')
-                .fontSize(PhoneTheme.FONT_MICRO)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_TERTIARY)
-
-              Text(`${this.getSelectedRecord().peakRiskPct}%`)
+            Row({ space: 3 }) {
+              Text(`${this.selectedRecord().episodesCount}`)
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(this.getSelectedRecord().peakRiskPct >= 70 ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Center)
-
-            Divider().vertical(true).height(32).color(PhoneTheme.BORDER_LIGHT)
-
-            Column({ space: 2 }) {
-              Text('ALERTS')
-                .fontSize(PhoneTheme.FONT_MICRO)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_TERTIARY)
-
-              Text(`${this.getSelectedRecord().episodesCount}/2`)
-                .fontSize(20)
-                .fontWeight(FontWeight.Bold)
+                .fontFeature('"tnum" on')
                 .fontColor(PhoneTheme.TEXT_PRIMARY)
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Center)
-
-            Divider().vertical(true).height(32).color(PhoneTheme.BORDER_LIGHT)
-
-            Column({ space: 2 }) {
-              Text('FINGER-PRICK')
+              Text('/ 2')
                 .fontSize(PhoneTheme.FONT_MICRO)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_TERTIARY)
-
-              Text(this.getPrickDisplay(this.getSelectedRecord()))
-                .fontSize(13)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.getSelectedRecord().fingerPrickVerdict === 'Confirmed Low' ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
-                .maxLines(1)
-                .margin({ top: 4 })
+                .fontColor(PhoneTheme.TEXT_MUTED)
+                .margin({ bottom: 2 })
             }
-            .layoutWeight(1.2)
-            .alignItems(HorizontalAlign.Center)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(PhoneTheme.CARD_PADDING)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.CARD_RADIUS)
-        .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
+            .alignItems(VerticalAlign.Bottom)
 
-        // Overnight Symptom Risk Bars (12am - 8am)
-        Column({ space: 10 }) {
-          Row() {
-            Text('Symptom risk 12am–8am')
-              .fontSize(PhoneTheme.FONT_SECTION)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-            Blank()
-            Text('Alert line 70%')
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
+            Text('Alerts')
+              .fontSize(PhoneTheme.FONT_CAPTION)
               .fontColor(PhoneTheme.TEXT_MUTED)
-              .backgroundColor(PhoneTheme.BG_SUBTLE)
-              .borderRadius(PhoneTheme.PILL_RADIUS)
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
+          .layoutWeight(1)
+          .padding(12)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderRadius(18)
+          .shadow({ radius: 8, color: 'rgba(17, 19, 24, 0.04)', offsetY: 2 })
+          .alignItems(HorizontalAlign.Start)
 
-          Row({ space: 10 }) {
-            ForEach(this.getSelectedRecord().hourlyRiskPct, (val: number, idx: number) => {
-              Column({ space: 4 }) {
-                Text(`${val}%`)
-                  .fontSize(PhoneTheme.FONT_CAPTION)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(val >= 70 ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
-                  .height(14)
-                  .maxLines(1)
+          // Finger-prick
+          Column({ space: 6 }) {
+            Row() {
+              Blank()
+              SymbolGlyph($r('sys.symbol.drop_fill'))
+                .fontSize(12)
+                .fontColor([PhoneTheme.BRAND_ACCENT])
+            }
+            .width('100%')
 
-                Stack({ alignContent: Alignment.Bottom }) {
-                  Row()
-                    .width('100%')
-                    .height(96)
-                    .backgroundColor(PhoneTheme.BG_SUBTLE)
-                    .borderRadius(6)
-                  Row()
-                    .width('100%')
-                    .height(Math.max(8, Math.round((val / 100) * 96)))
-                    .backgroundColor(getOvernightBarColor(val))
-                    .borderRadius(6)
-                }
-                .width('100%')
-                .height(96)
+            Text(this.prickDisplay(this.selectedRecord()))
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontFeature('"tnum" on')
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .height(24)
 
-                Text(idx === 0 ? '12am' : (idx === 1 ? '2am' : (idx === 2 ? '4am' : (idx === 3 ? '6am' : '8am'))))
-                  .fontSize(PhoneTheme.FONT_MICRO)
-                  .fontColor(PhoneTheme.TEXT_MUTED)
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Center)
-            })
+            Text('Check')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontColor(PhoneTheme.TEXT_MUTED)
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Bottom)
+          .layoutWeight(1.1)
+          .padding(12)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderRadius(18)
+          .shadow({ radius: 8, color: 'rgba(17, 19, 24, 0.04)', offsetY: 2 })
+          .alignItems(HorizontalAlign.Start)
         }
         .width('100%')
-        .padding(PhoneTheme.CARD_PADDING)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.CARD_RADIUS)
-        .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
 
-        // Action Trail
-        Column({ space: 10 }) {
-          Row() {
-            Text('Events & check-ins')
-              .fontSize(PhoneTheme.FONT_SECTION)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-
-            Blank()
-
-            Text(this.getSelectedRecord().actionsTaken.length === 0 ? 'None' : `${this.getSelectedRecord().actionsTaken.length}`)
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.getSelectedRecord().actionsTaken.length > 0 ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT)
-              .backgroundColor(this.getSelectedRecord().actionsTaken.length > 0 ? PhoneTheme.STATE_WARN_BG : PhoneTheme.STATE_OK_BG)
-              .borderRadius(PhoneTheme.PILL_RADIUS)
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          }
-          .width('100%')
-
+        // Event Rows
+        if (this.filteredActions().length === 0) {
+          Text('No logs found')
+            .fontSize(PhoneTheme.FONT_BODY)
+            .fontColor(PhoneTheme.TEXT_MUTED)
+            .padding(16)
+            .width('100%')
+            .backgroundColor(PhoneTheme.BG_CARD)
+            .borderRadius(PhoneTheme.CARD_RADIUS)
+        } else {
           Column({ space: 8 }) {
-            ForEach(this.getSelectedRecord().actionsTaken, (action: ActionTakenEntry) => {
-              Row({ space: 10 }) {
-                Circle({ width: 6, height: 6 })
-                  .fill(action.type === 'sms' || action.type === 'call' ? PhoneTheme.STATE_CRIT : (action.type === 'prick' ? PhoneTheme.BRAND_ACCENT : PhoneTheme.STATE_OK))
-                  .margin({ top: 5 })
+            ForEach(this.filteredActions(), (action: ActionTakenEntry, idx: number) => {
+              Row({ space: 12 }) {
+                Stack({ alignContent: Alignment.Center }) {
+                  Circle({ width: 38, height: 38 })
+                    .fill(
+                      action.type === 'prick'
+                        ? PhoneTheme.BRAND_ACCENT_BG
+                        : (action.type === 'resolve' ? PhoneTheme.STATE_OK_BG : PhoneTheme.STATE_CRIT_BG)
+                    )
 
-                Column({ space: 2 }) {
-                  Row() {
+                  SymbolGlyph(
+                    action.type === 'prick'
+                      ? $r('sys.symbol.drop_fill')
+                      : (action.type === 'resolve' ? $r('sys.symbol.checkmark_circle_fill') : $r('sys.symbol.bell_fill'))
+                  )
+                    .fontSize(16)
+                    .fontColor([
+                      action.type === 'prick'
+                        ? PhoneTheme.BRAND_ACCENT
+                        : (action.type === 'resolve' ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.STATE_CRIT_TEXT)
+                    ])
+                }
+                .width(38)
+                .height(38)
+
+                Column({ space: 3 }) {
+                  Row({ space: 6 }) {
                     Text(action.title)
                       .fontSize(PhoneTheme.FONT_BODY)
                       .fontWeight(FontWeight.Bold)
@@ -317,42 +527,65 @@ export struct TrendsView {
 
                     Text(action.time)
                       .fontSize(PhoneTheme.FONT_MICRO)
-                      .fontColor(PhoneTheme.TEXT_TERTIARY)
+                      .fontFeature('"tnum" on')
+                      .fontColor(PhoneTheme.TEXT_MUTED)
                   }
                   .width('100%')
 
-                  Text(action.detail)
-                    .fontSize(PhoneTheme.FONT_CAPTION)
-                    .fontColor(PhoneTheme.TEXT_MUTED)
-                    .width('100%')
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Row({ space: 8 }) {
+                    Text(
+                      action.type === 'resolve'
+                        ? this.statusLabel('NORMAL')
+                        : (action.type === 'prick' ? 'Checked' : this.statusLabel('CRITICAL'))
+                    )
+                      .fontSize(PhoneTheme.FONT_MICRO)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(
+                        action.type === 'resolve'
+                          ? PhoneTheme.STATE_OK_TEXT
+                          : (action.type === 'prick' ? PhoneTheme.BRAND_ACCENT : PhoneTheme.STATE_CRIT_TEXT)
+                      )
+                      .backgroundColor(
+                        action.type === 'resolve'
+                          ? PhoneTheme.STATE_OK_BG
+                          : (action.type === 'prick' ? PhoneTheme.BRAND_ACCENT_BG : PhoneTheme.STATE_CRIT_BG)
+                      )
+                      .borderRadius(PhoneTheme.PILL_RADIUS)
+                      .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+
+                    Text(action.detail)
+                      .fontSize(PhoneTheme.FONT_CAPTION)
+                      .fontColor(PhoneTheme.TEXT_MUTED)
+                      .layoutWeight(1)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  }
+                  .width('100%')
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
+
+                SymbolGlyph($r('sys.symbol.chevron_right'))
+                  .fontSize(14)
+                  .fontColor([PhoneTheme.TEXT_MUTED])
               }
               .width('100%')
-              .padding(10)
-              .backgroundColor(PhoneTheme.BG_PAGE)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
-              .alignItems(VerticalAlign.Top)
-            })
+              .padding({ left: 12, right: 14, top: 10, bottom: 10 })
+              .backgroundColor(PhoneTheme.BG_CARD)
+              .borderRadius(20)
+              .shadow({ radius: 8, color: 'rgba(17, 19, 24, 0.04)', offsetY: 2 })
+              .alignItems(VerticalAlign.Center)
+            }, (action: ActionTakenEntry, idx: number) => `${this.selectedRecord().id}_${idx}_${action.title}`)
           }
           .width('100%')
         }
-        .width('100%')
-        .padding(PhoneTheme.CARD_PADDING)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.CARD_RADIUS)
-        .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 8, bottom: 88 })
+      .padding({ left: 16, right: 16, top: 12, bottom: 104 })
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(PhoneTheme.BG_PAGE)
     .scrollBar(BarState.Off)
     .scrollable(ScrollDirection.Vertical)
   }

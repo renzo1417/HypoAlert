@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Huawei Health Bedside Coordinator with 3 Navigation Tabs:
- * 1. Monitor (Symptom Risk & Finger-Prick Check-In) • 2. History (Overnight Risk) • 3. Guardian (Profile, Gates & Alerts).
+ * Phone Companion — Pastel Wellness UI Root Coordinator bound directly to 7676da5 VitalsModel & TcnnEngine.
+ * Tabs: 0 Monitor • 1 History • 2 Reports (Arc Gauge & Phase Switch) • 3 Guardian (Routing & SMN).
  */
 
 import {
@@ -14,17 +14,17 @@ import {
 } from '../models/VitalsModel';
 import { TcnnNightState } from '../models/TcnnEngine';
 import { LOSO_C2S02_BUNDLE, REPLAY_C2S02_NIGHT } from '../models/TcnnWeights';
-import { HistoryRepository } from '../models/HistoryModel';
+import { HistoryRepository, NightHistoryRecord } from '../models/HistoryModel';
 import { AlertService } from '../services/AlertService';
 import { DeviceConnectionManager, ConnectionState, ConnectionListener } from '../services/DeviceConnectionManager';
 import { formatLocalTime, formatLogTime } from '../common/utils/TimeUtils';
-import { AuditEntry } from './models/PhoneTypes';
+import { ScenarioPreset } from './models/PhoneTypes';
 import { ppgSample, riskLevel } from './utils/PhoneRiskUtils';
 import { PhoneTheme } from './utils/PhoneTheme';
-import { PhoneTopBar } from './components/PhoneTopBar';
 import { DemoSheet } from './components/DemoSheet';
 import { MonitorView } from './views/MonitorView';
 import { TrendsView } from './views/TrendsView';
+import { ReportsView } from './views/ReportsView';
 import { FamilyView } from './views/FamilyView';
 
 @Component
@@ -36,10 +36,11 @@ export struct PhonePage {
   @State gateProgress: GateProgress = HistoryRepository.getGateProgress();
   @State vitals: VitalsData = VitalsEngine.createInitialVitals(BodyPhenotype.ADRENERGIC, 1, 3.7);
   @State pendingPrickCheck: boolean = false;
+  @State lastCheckSummary: string = '';
   @State historyVersion: number = 0;
+
   @State watchBattery: number = 86;
   @State isWatchConnected: boolean = true;
-  @State deviceName: string = 'HUAWEI WATCH 4 Pro';
   @State isTestSheetOpen: boolean = false;
   @State replayActive: boolean = false;
 
@@ -47,10 +48,6 @@ export struct PhonePage {
   @State caregiverPhone: string = '+63 917 123 4567';
   @State smnEnabled: boolean = true;
   @State smnLastSent: string = '';
-  @State auditLog: AuditEntry[] = [
-    { time: '22:00', message: '75-min sleep baseline started', level: 'ok' },
-    { time: '23:15', message: 'Baseline ready — checking every 5 min', level: 'ok' }
-  ];
 
   private alertService: AlertService = AlertService.getInstance();
   private connManager: DeviceConnectionManager = DeviceConnectionManager.getInstance();
@@ -64,28 +61,24 @@ export struct PhonePage {
   private ppgSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private ppgContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.ppgSettings);
   private ppgReady: boolean = false;
+  private ppgWidth: number = 170;
+  private ppgHeight: number = 98;
   private ppgPhase: number = 0.0;
   private ppgData: number[] = [];
-  private readonly PPG_LEN: number = 120;
+  private readonly PPG_LEN: number = 90;
 
   aboutToAppear(): void {
     this.currentTime = formatLocalTime(new Date());
+    this.gateProgress = HistoryRepository.getGateProgress();
     for (let i: number = 0; i < this.PPG_LEN; i++) {
       this.ppgData.push(ppgSample(i / this.PPG_LEN));
     }
 
     this.isWatchConnected = this.connManager.isConnected();
-    this.deviceName = this.connManager.getState().deviceName;
     this.watchBattery = this.connManager.getState().batteryLevel;
     this.connListener = (state: ConnectionState) => {
       this.isWatchConnected = state.isConnected;
-      this.deviceName = state.deviceName;
       this.watchBattery = state.batteryLevel;
-      if (!state.isConnected) {
-        this.logEvent('Phone link paused — watch monitors autonomously', 'warn');
-      } else {
-        this.logEvent('Watch connected — live telemetry active', 'ok');
-      }
     };
     this.connManager.addListener(this.connListener);
 
@@ -97,7 +90,7 @@ export struct PhonePage {
         this.pushPpgSamples();
         this.drawPPG();
       }
-    }, 100);
+    }, 110);
   }
 
   aboutToDisappear(): void {
@@ -140,17 +133,21 @@ export struct PhonePage {
   }
 
   private pushPpgSamples(): void {
-    const step: number = 0.045 + this.vitals.pulse / 4000.0;
-    for (let k: number = 0; k < 5; k++) {
+    const step: number = 0.042 + this.vitals.pulse / 4200.0;
+    for (let k: number = 0; k < 3; k++) {
       this.ppgPhase += step;
       if (this.ppgPhase >= 1.0) {
         this.ppgPhase -= 1.0;
       }
-      const noise: number = (Math.random() - 0.5) * 0.04;
+      const noise: number = (Math.random() - 0.5) * (!this.vitals.isSedentary ? 0.07 : 0.025);
       this.ppgData.push(ppgSample(this.ppgPhase) + noise);
       if (this.ppgData.length > this.PPG_LEN) {
         this.ppgData.shift();
       }
+    }
+    if (this.watchBattery > 20 && Math.random() < 0.008) {
+      this.watchBattery -= 1;
+      this.connManager.setBattery(this.watchBattery);
     }
   }
 
@@ -159,136 +156,161 @@ export struct PhonePage {
       return;
     }
     const ctx: CanvasRenderingContext2D = this.ppgContext;
-    const W: number = 320;
-    const H: number = 56;
+    const W: number = this.ppgWidth > 0 ? this.ppgWidth : 170;
+    const H: number = this.ppgHeight > 0 ? this.ppgHeight : 98;
     ctx.clearRect(0, 0, W, H);
-    ctx.beginPath();
-    ctx.strokeStyle = this.isEmergency() ? '#EF4444' : '#0284C7';
-    ctx.lineWidth = 2;
+
     const n: number = this.ppgData.length;
+    if (n < 4) {
+      return;
+    }
+
+    const lvl: string = riskLevel(this.vitals);
+    const strokeColor: string = lvl === 'Critical'
+      ? PhoneTheme.STATE_CRIT
+      : (lvl === 'Warning' ? PhoneTheme.STATE_WARN : PhoneTheme.BENTO_LAV_LINE);
+
+    const padTop: number = 16;
+    const padBot: number = 14;
+    const usableH: number = Math.max(24, H - padTop - padBot);
+
+    const pointsX: number[] = [];
+    const pointsY: number[] = [];
     for (let i: number = 0; i < n; i++) {
-      const v: number = this.ppgData[i];
+      const v: number = Math.min(1.15, Math.max(-0.1, this.ppgData[i]));
       const x: number = (i / (this.PPG_LEN - 1)) * W;
-      let y: number = H - 6 - v * 36;
-      if (y < 4) {
-        y = 4;
-      }
-      if (y > H - 4) {
-        y = H - 4;
-      }
+      const y: number = H - padBot - (v / 1.15) * usableH;
+      pointsX.push(x);
+      pointsY.push(y);
+    }
+
+    const grad: CanvasGradient = ctx.createLinearGradient(0, padTop, 0, H);
+    grad.addColorStop(0, lvl === 'Critical' ? 'rgba(239, 68, 68, 0.26)' : 'rgba(139, 92, 246, 0.24)');
+    grad.addColorStop(1, 'rgba(139, 92, 246, 0.02)');
+
+    ctx.beginPath();
+    ctx.moveTo(pointsX[0], H);
+    for (let i: number = 0; i < n; i++) {
+      ctx.lineTo(pointsX[i], pointsY[i]);
+    }
+    ctx.lineTo(pointsX[n - 1], H);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    for (let i: number = 0; i < n; i++) {
       if (i === 0) {
-        ctx.moveTo(x, y);
+        ctx.moveTo(pointsX[i], pointsY[i]);
       } else {
-        ctx.lineTo(x, y);
+        ctx.lineTo(pointsX[i], pointsY[i]);
       }
     }
     ctx.stroke();
-  }
 
-  private logEvent(message: string, level: string): void {
-    const t: string = formatLogTime(new Date());
-    const entry: AuditEntry = { time: t, message: message, level: level };
-    this.auditLog.unshift(entry);
-    if (this.auditLog.length > 8) {
-      this.auditLog.pop();
+    const idxA: number = Math.floor(n * 0.42);
+    const idxB: number = Math.floor(n * 0.78);
+    const markers: number[] = [idxA, idxB];
+    for (let m: number = 0; m < markers.length; m++) {
+      const idx: number = markers[m];
+      ctx.fillStyle = strokeColor;
+      ctx.beginPath();
+      ctx.arc(pointsX[idx], pointsY[idx], 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(pointsX[idx], pointsY[idx], 2.5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
-  private simulateBaseline(): void {
-    this.stopReplay();
-    this.alertService.stopEmergencyAlert();
-    this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, false);
-    this.vitals = VitalsEngine.generateBaselineVitals(
-      this.vitals,
-      this.phenotype,
-      this.activePhase,
-      this.getActiveThreshold(),
-      40,
-      this.tcnnNight
-    );
-    this.logEvent('75-min silent baseline warm-up previewed', 'info');
-  }
-
-  private simulateSteady(): void {
-    this.stopReplay();
-    this.alertService.stopEmergencyAlert();
-    this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, true);
-    this.vitals = VitalsEngine.generateSteadyVitals(
-      this.vitals,
-      this.phenotype,
-      this.activePhase,
-      this.getActiveThreshold(),
-      75,
-      this.vitals.alertsTonight,
-      0,
-      this.tcnnNight
-    );
-    this.logEvent('Calm nocturnal vitals restored', 'ok');
-  }
-
-  private simulateStepCheck(): void {
-    this.stopReplay();
-    this.vitals = VitalsEngine.generateElevatedStep(
-      this.vitals,
-      this.phenotype,
-      this.activePhase,
-      this.getActiveThreshold(),
-      false,
-      this.tcnnNight
-    );
-    if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
-      this.fireEmergencyAlert();
-    } else {
-      this.logEvent(`Elevated check ${this.vitals.streakCount}/${this.vitals.streakRequired} (waiting for repeat)`, 'warn');
+  private runScenario(preset: ScenarioPreset): void {
+    if (preset === 'replay') {
+      this.simulateReplayC2s02();
+      return;
     }
-  }
 
-  private simulateSurge(): void {
-    this.stopReplay();
-    this.vitals = VitalsEngine.generateElevatedStep(
-      this.vitals,
-      this.phenotype,
-      this.activePhase,
-      this.getActiveThreshold(),
-      true,
-      this.tcnnNight
-    );
-    if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
-      this.fireEmergencyAlert();
-    } else {
-      this.logEvent('Sustained surge blocked by 30m cooldown or max 2/night cap', 'warn');
-    }
-  }
-
-  private simulateMoving(): void {
     this.stopReplay();
     this.alertService.stopEmergencyAlert();
-    this.vitals = VitalsEngine.generateMovingVitals(
-      this.vitals,
-      this.phenotype,
-      this.activePhase,
-      this.getActiveThreshold(),
-      this.tcnnNight
-    );
-    this.logEvent('Motion detected — checks paused', 'info');
+    if (preset === 'calm') {
+      this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, true);
+      this.vitals = VitalsEngine.generateSteadyVitals(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        75,
+        this.vitals.alertsTonight,
+        0,
+        this.tcnnNight
+      );
+      this.pendingPrickCheck = false;
+    } else if (preset === 'motion') {
+      this.vitals = VitalsEngine.generateMovingVitals(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        this.tcnnNight
+      );
+    } else if (preset === 'baseline') {
+      this.tcnnNight = VitalsEngine.createPhase3NightState(this.phenotype, false);
+      this.vitals = VitalsEngine.generateBaselineVitals(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        40,
+        this.tcnnNight
+      );
+      this.pendingPrickCheck = false;
+    } else if (preset === 'warning') {
+      this.vitals = VitalsEngine.generateElevatedStep(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        false,
+        this.tcnnNight
+      );
+      if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+        this.fireEmergencyAlert();
+      }
+    } else if (preset === 'surge') {
+      this.vitals = VitalsEngine.generateElevatedStep(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        true,
+        this.tcnnNight
+      );
+      if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+        this.fireEmergencyAlert();
+      }
+    }
+    this.drawPPG();
   }
 
   private simulateReplayC2s02(): void {
     if (this.replayActive) {
       this.stopReplay();
-      this.logEvent('Stopped real c2s02_7 LOSO replay', 'info');
       return;
     }
     this.alertService.stopEmergencyAlert();
     this.activePhase = 3;
     this.phenotype = BodyPhenotype.ADRENERGIC;
+    this.tcnnNight = VitalsEngine.createPhase3NightState(BodyPhenotype.ADRENERGIC, true);
     this.replayActive = true;
 
     let frameIdx: number = 0;
     let streak: number = 0;
     let cooldownMin: number = 0;
     const alertsCount: number = 0;
-    this.logEvent('Streaming held-out c2s02_7 night through Phase 3 1D-CNN', 'info');
 
     const stepReplay = (): void => {
       if (!this.replayActive || frameIdx >= REPLAY_C2S02_NIGHT.framesZ.length) {
@@ -325,11 +347,9 @@ export struct PhonePage {
     this.vitals.alertsTonight = Math.min(VitalsEngine.MAX_ALERTS_PER_NIGHT, this.vitals.alertsTonight + 1);
     this.pendingPrickCheck = true;
     this.alertService.startEmergencyAlert();
-    this.logEvent(`Symptom alert fired (${this.vitals.alertsTonight}/2 tonight)`, 'crit');
     if (this.smnEnabled) {
       const t: string = formatLogTime(new Date());
       this.smnLastSent = t;
-      this.logEvent(`Check-in SMS queued to ${this.caregiverName}`, 'crit');
       HistoryRepository.updateTonightCrisis(
         this.vitals.symptomRiskPct,
         this.vitals.heuristicScore,
@@ -356,9 +376,9 @@ export struct PhonePage {
       VitalsEngine.COOLDOWN_MINUTES,
       this.tcnnNight
     );
-    this.logEvent('Awake confirmed • 30-min cooldown active', 'ok');
     HistoryRepository.updateTonightResolved();
     this.historyVersion += 1;
+    this.drawPPG();
   }
 
   private handleLogFingerPrick(mgDl: number): void {
@@ -367,34 +387,16 @@ export struct PhonePage {
     this.gateProgress = updated;
     this.pendingPrickCheck = false;
     this.historyVersion += 1;
+
     if (updated.isCnnUnlocked && this.activePhase < 3) {
       this.activePhase = 3;
-      this.tcnnNight = VitalsEngine.createPhase3NightState(
-        this.phenotype,
-        this.vitals.baselineMinutes >= VitalsEngine.BASELINE_TOTAL_MINUTES
-      );
-      this.logEvent('Gate 2 passed — Phase 3 1D-CNN unlocked!', 'ok');
     } else if (updated.hasPersonalLine && this.activePhase === 1) {
       this.activePhase = 2;
-      this.logEvent(`Gate 1 passed — personal line ${updated.personalLine.toFixed(2)} ready`, 'ok');
-    } else {
-      this.logEvent(`Finger-prick logged: ${mgDl} mg/dL`, 'ok');
     }
-    this.vitals = VitalsEngine.generateSteadyVitals(
-      this.vitals,
-      this.phenotype,
-      this.activePhase,
-      this.getActiveThreshold(),
-      this.vitals.baselineMinutes,
-      this.vitals.alertsTonight,
-      this.vitals.cooldownMinutes,
-      this.tcnnNight
-    );
-  }
 
-  private handleSelectPhenotype(p: BodyPhenotype): void {
-    this.stopReplay();
-    this.phenotype = p;
+    const tonight: NightHistoryRecord = HistoryRepository.getHistory()[0];
+    this.lastCheckSummary = tonight.actionsSummary;
+
     this.tcnnNight = VitalsEngine.createPhase3NightState(
       this.phenotype,
       this.vitals.baselineMinutes >= VitalsEngine.BASELINE_TOTAL_MINUTES
@@ -430,19 +432,52 @@ export struct PhonePage {
     );
   }
 
+  private handleSelectPhenotype(p: BodyPhenotype): void {
+    this.stopReplay();
+    this.phenotype = p;
+    this.tcnnNight = VitalsEngine.createPhase3NightState(
+      this.phenotype,
+      this.vitals.baselineMinutes >= VitalsEngine.BASELINE_TOTAL_MINUTES
+    );
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      this.vitals.baselineMinutes,
+      this.vitals.alertsTonight,
+      this.vitals.cooldownMinutes,
+      this.tcnnNight
+    );
+  }
+
   private handleCallNow(): void {
-    const lvl: string = riskLevel(this.vitals);
-    if (lvl === 'Critical') {
-      this.logEvent(`Emergency call placed to ${this.caregiverName}`, 'crit');
-    } else {
-      this.logEvent(`Checked in with ${this.caregiverName}`, 'info');
-    }
+    const t: string = formatLogTime(new Date());
+    const tonight: NightHistoryRecord = HistoryRepository.getHistory()[0];
+    tonight.actionsTaken.unshift({
+      time: t,
+      type: 'call',
+      title: `Call Placed to ${this.caregiverName}`,
+      detail: `${this.caregiverPhone}`,
+      target: `${this.caregiverName} (${this.caregiverPhone})`,
+      status: 'Delivered'
+    });
+    this.historyVersion += 1;
   }
 
   private sendTestSmn(): void {
     const t: string = formatLogTime(new Date());
     this.smnLastSent = t;
-    this.logEvent(`Test SMS simulated for ${this.caregiverPhone}`, 'ok');
+    const tonight: NightHistoryRecord = HistoryRepository.getHistory()[0];
+    tonight.actionsTaken.unshift({
+      time: t,
+      type: 'sms',
+      title: `Test SMS Sent to ${this.caregiverName}`,
+      detail: `Huawei Cloud SMN link verified (${this.caregiverPhone})`,
+      target: `${this.caregiverName} (${this.caregiverPhone})`,
+      status: 'Delivered'
+    });
+    this.historyVersion += 1;
   }
 
   private switchToTab(index: number): void {
@@ -450,16 +485,35 @@ export struct PhonePage {
     this.tabsController.changeIndex(index);
   }
 
+  private dockSymbol(index: number, active: boolean): Resource {
+    if (index === 0) {
+      return active ? $r('sys.symbol.house_fill') : $r('sys.symbol.house');
+    }
+    if (index === 1) {
+      return active ? $r('sys.symbol.calendar_fill') : $r('sys.symbol.calendar');
+    }
+    if (index === 2) {
+      return active ? $r('sys.symbol.histogram_fill') : $r('sys.symbol.histogram');
+    }
+    return active ? $r('sys.symbol.person_fill') : $r('sys.symbol.person');
+  }
+
   @Builder
   globalEmergencyBanner() {
     if (this.isEmergency()) {
       Row({ space: 10 }) {
-        Circle({ width: 6, height: 6 })
-          .fill(PhoneTheme.BG_CARD)
+        SymbolGlyph($r('sys.symbol.exclamationmark_triangle_fill'))
+          .fontSize(14)
+          .fontColor([PhoneTheme.TEXT_ON_DARK])
 
-        Text(`${this.vitals.symptomRiskPct}% Risk • ${this.vitals.streakCount}/${this.vitals.streakRequired} checks`)
+        Text(
+          this.activePhase === 3
+            ? `Surge · ${this.vitals.symptomRiskPct}%`
+            : `Surge · ${this.vitals.heuristicScore.toFixed(1)}`
+        )
           .fontSize(PhoneTheme.FONT_BODY)
           .fontWeight(FontWeight.Bold)
+          .fontFeature('"tnum" on')
           .fontColor(PhoneTheme.TEXT_ON_DARK)
           .layoutWeight(1)
           .maxLines(1)
@@ -471,7 +525,7 @@ export struct PhonePage {
           .height(32)
           .padding({ left: 12, right: 12 })
           .backgroundColor(PhoneTheme.BG_CARD)
-          .fontColor(PhoneTheme.STATE_CRIT)
+          .fontColor(PhoneTheme.STATE_CRIT_DARK)
           .borderRadius(PhoneTheme.PILL_RADIUS)
           .onClick(() => {
             this.markWithThem();
@@ -480,66 +534,37 @@ export struct PhonePage {
       .width('100%')
       .height(44)
       .padding({ left: 16, right: 12 })
-      .backgroundColor(PhoneTheme.STATE_CRIT)
+      .backgroundColor(PhoneTheme.STATE_CRIT_DARK)
+      .alignItems(VerticalAlign.Center)
     }
   }
 
   @Builder
-  floatingTabButton(index: number, label: string) {
+  dockTabButton(index: number) {
     Button() {
-      Column({ space: 2 }) {
-        Stack({ alignContent: Alignment.Center }) {
-          if (this.currentTabIndex === index) {
-            Circle({ width: 34, height: 34 })
-              .fill(PhoneTheme.BRAND_PRIMARY)
-          }
-
-          if (index === 0) {
-            Row({ space: 2 }) {
-              Row().width(3).height(8).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
-              Row().width(3).height(14).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
-              Row().width(3).height(6).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
-            }
-            .alignItems(VerticalAlign.Center)
-          } else if (index === 1) {
-            Row({ space: 2 }) {
-              Row().width(3).height(6).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
-              Row().width(3).height(10).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
-              Row().width(3).height(14).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
-            }
-            .alignItems(VerticalAlign.Bottom)
-          } else {
-            Stack({ alignContent: Alignment.Center }) {
-              Row()
-                .width(12)
-                .height(14)
-                .backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY)
-                .borderRadius({ topLeft: 2, topRight: 2, bottomLeft: 6, bottomRight: 6 })
-
-              if (this.isEmergency()) {
-                Circle({ width: 5, height: 5 })
-                  .fill(PhoneTheme.STATE_CRIT)
-                  .offset({ x: 6, y: -6 })
-              }
-            }
-            .width(16)
-            .height(16)
-          }
+      Stack({ alignContent: Alignment.Center }) {
+        if (this.currentTabIndex === index) {
+          Circle({ width: 48, height: 48 })
+            .fill(PhoneTheme.BG_CARD)
         }
-        .width(36)
-        .height(36)
 
-        Text(label)
-          .fontSize(PhoneTheme.FONT_MICRO)
-          .fontWeight(this.currentTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
-          .fontColor(this.currentTabIndex === index ? PhoneTheme.TEXT_PRIMARY : PhoneTheme.TEXT_MUTED)
+        SymbolGlyph(this.dockSymbol(index, this.currentTabIndex === index))
+          .fontSize(20)
+          .fontColor([this.currentTabIndex === index ? PhoneTheme.BG_NAV : PhoneTheme.TEXT_ON_DARK])
+
+        if (index === 3 && this.isEmergency() && this.currentTabIndex !== 3) {
+          Circle({ width: 6, height: 6 })
+            .fill(PhoneTheme.STATE_CRIT)
+            .offset({ x: 11, y: -9 })
+        }
       }
-      .alignItems(HorizontalAlign.Center)
-      .justifyContent(FlexAlign.Center)
+      .width(48)
+      .height(48)
     }
     .layoutWeight(1)
-    .height(48)
-    .backgroundColor('transparent')
+    .height(54)
+    .backgroundColor(Color.Transparent)
+    .padding(0)
     .onClick(() => {
       this.switchToTab(index);
     })
@@ -548,33 +573,31 @@ export struct PhonePage {
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
-        PhoneTopBar({
-          currentTime: this.currentTime,
-          isEmergency: this.isEmergency(),
-          isWatchConnected: this.isWatchConnected,
-          watchBattery: this.watchBattery,
-          deviceName: this.deviceName,
-          onOpenTest: () => {
-            this.isTestSheetOpen = !this.isTestSheetOpen;
-          }
-        })
-
         this.globalEmergencyBanner()
 
         Tabs({ barPosition: BarPosition.End, controller: this.tabsController }) {
+          // 0: Home Monitor
           TabContent() {
             MonitorView({
               vitals: this.vitals,
               gateProgress: this.gateProgress,
-              currentTime: this.currentTime,
               watchBattery: this.watchBattery,
               isWatchConnected: this.isWatchConnected,
-              pendingPrickCheck: this.pendingPrickCheck,
+              replayActive: this.replayActive,
               caregiverName: this.caregiverName,
               caregiverPhone: this.caregiverPhone,
+              smnEnabled: this.smnEnabled,
+              smnLastSent: this.smnLastSent,
+              pendingPrickCheck: this.pendingPrickCheck,
+              lastCheckSummary: this.lastCheckSummary,
               ppgContext: this.ppgContext,
               onCanvasReady: () => {
                 this.ppgReady = true;
+                this.drawPPG();
+              },
+              onCanvasResize: (w: number, h: number) => {
+                this.ppgWidth = w;
+                this.ppgHeight = h;
                 this.drawPPG();
               },
               onCallNow: () => {
@@ -589,43 +612,67 @@ export struct PhonePage {
               onLogFingerPrick: (mgDl: number) => {
                 this.handleLogFingerPrick(mgDl);
               },
+              onOpenTest: () => {
+                this.isTestSheetOpen = !this.isTestSheetOpen;
+              },
               onNavigateTab: (tabIndex: number) => {
                 this.switchToTab(tabIndex);
               }
             })
           }
 
+          // 1: History & Select Window Ruler
           TabContent() {
             TrendsView({
               vitals: this.vitals,
-              currentTime: this.currentTime,
-              historyVersion: this.historyVersion
+              historyVersion: this.historyVersion,
+              onOpenReports: () => {
+                this.switchToTab(2);
+              }
             })
           }
 
+          // 2: Reports (Phase Switcher + Multi-Color Arc Gauge + Dotted Bars)
+          TabContent() {
+            ReportsView({
+              activePhase: $activePhase,
+              vitals: this.vitals,
+              gateProgress: this.gateProgress,
+              historyVersion: this.historyVersion,
+              onBack: () => {
+                this.switchToTab(0);
+              },
+              onSelectPhase: (p: DetectionPhase) => {
+                this.handleSelectPhase(p);
+              }
+            })
+          }
+
+          // 3: Guardian (Body-Type Routing, Baseline, SMN & Contacts)
           TabContent() {
             FamilyView({
               caregiverName: $caregiverName,
               caregiverPhone: $caregiverPhone,
               smnEnabled: $smnEnabled,
+              activePhase: $activePhase,
+              phenotype: $phenotype,
               smnLastSent: this.smnLastSent,
-              phenotype: this.phenotype,
-              activePhase: this.activePhase,
+              isEmergency: this.isEmergency(),
               gateProgress: this.gateProgress,
               onCallNow: () => {
                 this.handleCallNow();
               },
-              onToggleSmn: (isOn: boolean) => {
-                this.logEvent(isOn ? 'Caregiver SMS alerts enabled' : 'Caregiver SMS alerts paused', 'info');
+              onToggleSmn: (_isOn: boolean) => {
+                this.historyVersion += 1;
               },
               onSendTestSmn: () => {
                 this.sendTestSmn();
               },
+              onSelectPhase: (p: DetectionPhase) => {
+                this.handleSelectPhase(p);
+              },
               onSelectPhenotype: (p: BodyPhenotype) => {
                 this.handleSelectPhenotype(p);
-              },
-              onSelectPhase: (phase: DetectionPhase) => {
-                this.handleSelectPhase(phase);
               }
             })
           }
@@ -643,23 +690,42 @@ export struct PhonePage {
       .height('100%')
       .backgroundColor(PhoneTheme.BG_PAGE)
 
-      Column({ space: 0 }) {
-        Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
+      // Signature Floating Navigation Dock: Obsidian Pill (4 tabs + White Active Circle) + Vivid Blue + Button
+      Row({ space: 10 }) {
         Row() {
-          this.floatingTabButton(0, 'Monitor')
-          this.floatingTabButton(1, 'History')
-          this.floatingTabButton(2, 'Guardian')
+          this.dockTabButton(0)
+          this.dockTabButton(1)
+          this.dockTabButton(2)
+          this.dockTabButton(3)
         }
-        .width('100%')
+        .layoutWeight(1)
         .height(64)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .padding({ left: 12, right: 12, bottom: 8 })
-        .justifyContent(FlexAlign.SpaceAround)
+        .padding({ left: 8, right: 8 })
+        .backgroundColor(PhoneTheme.BG_NAV)
+        .borderRadius(32)
+        .shadow({ radius: 22, color: 'rgba(17, 19, 24, 0.20)', offsetY: 8 })
         .alignItems(VerticalAlign.Center)
+
+        Button() {
+          SymbolGlyph($r('sys.symbol.plus'))
+            .fontSize(24)
+            .fontWeight(FontWeight.Medium)
+            .fontColor([PhoneTheme.TEXT_ON_DARK])
+        }
+        .width(60)
+        .height(60)
+        .backgroundColor(PhoneTheme.BRAND_ACCENT)
+        .borderRadius(30)
+        .shadow({ radius: 18, color: 'rgba(42, 130, 240, 0.36)', offsetY: 6 })
+        .onClick(() => {
+          this.isTestSheetOpen = !this.isTestSheetOpen;
+        })
       }
       .width('100%')
-      .backgroundColor(PhoneTheme.BG_CARD)
+      .padding({ left: 16, right: 16, bottom: 14 })
+      .alignItems(VerticalAlign.Center)
 
+      // Quick Check & Demo Overlay Sheet
       if (this.isTestSheetOpen) {
         Column() {
           Blank()
@@ -670,36 +736,20 @@ export struct PhonePage {
           DemoSheet({
             isWatchConnected: this.isWatchConnected,
             watchBattery: this.watchBattery,
-            phenotype: this.phenotype,
             activePhase: this.activePhase,
-            onSimulateBaseline: () => {
-              this.simulateBaseline();
+            phenotype: this.phenotype,
+            replayActive: this.replayActive,
+            onSelectPhase: (phase: DetectionPhase) => {
+              this.handleSelectPhase(phase);
             },
-            onSimulateSteady: () => {
-              this.simulateSteady();
+            onSelectPhenotype: (p: BodyPhenotype) => {
+              this.handleSelectPhenotype(p);
             },
-            onSimulateStepCheck: () => {
-              this.simulateStepCheck();
+            onRunScenario: (preset: ScenarioPreset) => {
+              this.runScenario(preset);
             },
-            onSimulateSurge: () => {
-              this.simulateSurge();
-            },
-            onSimulateMoving: () => {
-              this.simulateMoving();
-            },
-            onSimulateReplayC2s02: () => {
-              this.simulateReplayC2s02();
-            },
-            onTogglePhenotype: () => {
-              this.handleSelectPhenotype(
-                this.phenotype === BodyPhenotype.ADRENERGIC
-                  ? BodyPhenotype.BRADYCARDIC
-                  : BodyPhenotype.ADRENERGIC
-              );
-            },
-            onCyclePhase: () => {
-              const next: DetectionPhase = this.activePhase === 1 ? 2 : (this.activePhase === 2 ? 3 : 1);
-              this.handleSelectPhase(next);
+            onLogFingerPrick: (mgDl: number) => {
+              this.handleLogFingerPrick(mgDl);
             },
             onToggleWatchConnection: () => {
               this.connManager.toggleConnection();
@@ -708,11 +758,11 @@ export struct PhonePage {
               this.isTestSheetOpen = false;
             }
           })
-          .padding({ bottom: 20 })
+          .padding({ left: 10, right: 10, bottom: 12 })
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('rgba(15, 23, 42, 0.4)')
+        .backgroundColor('rgba(17, 19, 24, 0.36)')
       }
     }
     .width('100%')

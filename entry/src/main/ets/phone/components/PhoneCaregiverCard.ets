@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Minimalist Caregiver Quick-Contact Card.
- * Clean, pure white card without background accent fills.
+ * Phone Companion — Clean Caregiver Contact Pill Card.
  */
 
 import { PhoneTheme } from '../utils/PhoneTheme';
@@ -9,118 +8,82 @@ import { PhoneTheme } from '../utils/PhoneTheme';
 @Component
 export struct PhoneCaregiverCard {
   @Prop caregiverName: string = 'Maria Santos';
-  @Prop caregiverRole: string = 'Primary Caregiver';
+  @Prop caregiverRole: string = 'Primary caregiver';
   @Prop caregiverPhone: string = '+63 917 123 4567';
   @Prop isEmergency: boolean = false;
+  @Prop smnEnabled: boolean = true;
+  @Prop smnLastSent: string = '';
   onCall: () => void = () => {};
-  onMessage: () => void = () => {};
+
+  private initials(): string {
+    const parts: string[] = this.caregiverName.trim().split(' ');
+    if (parts.length >= 2 && parts[0].length > 0 && parts[1].length > 0) {
+      return `${parts[0].substring(0, 1)}${parts[1].substring(0, 1)}`.toUpperCase();
+    }
+    return this.caregiverName.length > 0 ? this.caregiverName.substring(0, 1).toUpperCase() : 'M';
+  }
 
   build() {
     Row({ space: 12 }) {
-      // Caregiver Avatar / Status Indicator
       Stack({ alignContent: Alignment.Center }) {
         Circle({ width: 42, height: 42 })
-          .fill(this.isEmergency ? PhoneTheme.STATE_CRIT_BG : PhoneTheme.BG_MUTED)
+          .fill(this.isEmergency ? PhoneTheme.STATE_CRIT_BG : PhoneTheme.BG_INSET)
 
-        Text(this.caregiverName.length > 0 ? this.caregiverName.substring(0, 1) : 'C')
-          .fontSize(16)
+        Text(this.initials())
+          .fontSize(14)
           .fontWeight(FontWeight.Bold)
-          .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
+          .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT_TEXT : PhoneTheme.TEXT_PRIMARY)
       }
       .width(42)
       .height(42)
 
-      // Name & Role Details
       Column({ space: 2 }) {
         Text(this.caregiverName)
-          .fontSize(PhoneTheme.FONT_SECTION)
+          .fontSize(PhoneTheme.FONT_SUBTITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor(PhoneTheme.TEXT_PRIMARY)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        Row({ space: 5 }) {
-          Circle({ width: 6, height: 6 })
-            .fill(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.STATE_OK)
-          Text(this.isEmergency ? 'Urgent Alert Sent' : `${this.caregiverRole} • Ready`)
-            .fontSize(PhoneTheme.FONT_BODY)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_MUTED)
-        }
-        .alignItems(VerticalAlign.Center)
+        Text(
+          this.isEmergency && this.smnLastSent.length > 0
+            ? `SMS sent · ${this.smnLastSent}`
+            : (this.smnEnabled ? 'Primary · SMS ready' : 'Primary · SMS off')
+        )
+          .fontSize(PhoneTheme.FONT_CAPTION)
+          .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT_TEXT : PhoneTheme.TEXT_MUTED)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
 
-      // Action Buttons (Message & Call)
-      Row({ space: 8 }) {
-        // Message / Notification button
-        Button() {
-          Stack({ alignContent: Alignment.Center }) {
-            // Chat bubble glyph
-            Column({ space: 2 }) {
-              Row()
-                .width(14)
-                .height(10)
-                .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_SECONDARY)
-                .borderRadius(2)
-              Row()
-                .width(5)
-                .height(3)
-                .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_SECONDARY)
-                .borderRadius(1)
-                .margin({ left: 2 })
-            }
-            .alignItems(HorizontalAlign.Start)
-          }
-          .width(38)
-          .height(38)
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.TILE_RADIUS)
-        .onClick(() => {
-          this.onMessage();
-        })
+      Button() {
+        Row({ space: 6 }) {
+          SymbolGlyph($r('sys.symbol.phone_fill'))
+            .fontSize(14)
+            .fontColor([PhoneTheme.TEXT_ON_DARK])
 
-        // Call button
-        Button() {
-          Stack({ alignContent: Alignment.Center }) {
-            // Phone handset glyph
-            Row() {
-              Circle({ width: 7, height: 7 })
-                .fill(this.isEmergency ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_PRIMARY)
-              Row()
-                .width(4)
-                .height(10)
-                .backgroundColor(this.isEmergency ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_PRIMARY)
-                .borderRadius(2)
-            }
-            .rotate({ angle: -25 })
-          }
-          .width(38)
-          .height(38)
+          Text('Call')
+            .fontSize(PhoneTheme.FONT_BODY)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
         }
-        .width(38)
-        .height(38)
-        .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.TILE_RADIUS)
-        .onClick(() => {
-          this.onCall();
-        })
+        .alignItems(VerticalAlign.Center)
       }
-      .alignItems(VerticalAlign.Center)
+      .height(42)
+      .padding({ left: 16, right: 16 })
+      .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT_DARK : PhoneTheme.BRAND_PRIMARY)
+      .borderRadius(PhoneTheme.PILL_RADIUS)
+      .onClick(() => {
+        this.onCall();
+      })
     }
     .width('100%')
     .padding({ left: 14, right: 14, top: 12, bottom: 12 })
     .backgroundColor(PhoneTheme.BG_CARD)
-    .borderWidth(1)
-    .borderColor(PhoneTheme.BORDER_SUBTLE)
     .borderRadius(PhoneTheme.CARD_RADIUS)
-    .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
+    .shadow({ radius: 12, color: 'rgba(17, 19, 24, 0.04)', offsetY: 3 })
     .alignItems(VerticalAlign.Center)
   }
 }

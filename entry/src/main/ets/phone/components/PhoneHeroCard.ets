@@ -1,290 +1,328 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Huawei Health Style Hero Card showing Symptom Risk, Phase, Streak, and Plain Reason.
+ * Phone Companion — Soft Sky-Blue Hero Card with Multi-Height Telemetry Bars.
+ * Displays Symptom Score (P1/P2) or 1D-CNN Symptom Risk (P3), Safety Streak filter, and urgent crisis actions.
  */
 
 import { VitalsData, VitalsEngine } from '../../models/VitalsModel';
-import { heroSentence, riskLevel, statusBadgeText } from '../utils/PhoneRiskUtils';
+import {
+  heroHeadline,
+  phenotypeShortLabel,
+  statusBadgeLabel
+} from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneHeroCard {
-  @Prop vitals: VitalsData = VitalsEngine.createInitialVitals();
-  @Prop currentTime: string = '00:00:00';
-  @Prop watchBattery: number = 86;
-  @Prop isWatchConnected: boolean = true;
+  @Prop @Watch('onHeroPropsChange') vitals: VitalsData = VitalsEngine.createInitialVitals();
+  @Prop smnSentTime: string = '';
+  @Prop caregiverName: string = 'Maria Santos';
   onCallNow: () => void = () => {};
   onMarkWithThem: () => void = () => {};
+  onQuickCheck: () => void = () => {};
 
-  private isEmergency(): boolean {
-    return riskLevel(this.vitals) === 'Critical';
+  private barSettings: RenderingContextSettings = new RenderingContextSettings(true);
+  private barCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.barSettings);
+  private barReady: boolean = false;
+  private barW: number = 112;
+  private barH: number = 46;
+
+  onHeroPropsChange(): void {
+    this.drawSymptomBars();
+  }
+
+  private isCritical(): boolean {
+    return this.vitals.statusTier === 'ALERT';
   }
 
   private isWarning(): boolean {
-    return riskLevel(this.vitals) === 'Warning';
+    return this.vitals.statusTier === 'WATCH';
   }
 
-  private isBaseline(): boolean {
+  private isGated(): boolean {
+    return !this.vitals.isSedentary;
+  }
+
+  private isLearning(): boolean {
     return this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES;
   }
 
-  private getCardBg(): string {
-    if (this.isEmergency()) {
-      return PhoneTheme.STATE_CRIT;
-    }
-    return PhoneTheme.BG_CARD;
+  private isCooldown(): boolean {
+    return this.vitals.cooldownMinutes > 0 && !this.isCritical() && !this.isWarning();
   }
 
-  private getBorderColor(): string {
-    if (this.isEmergency()) {
-      return PhoneTheme.STATE_CRIT_DARK;
+  private pillBg(): string {
+    if (this.isCritical()) {
+      return 'rgba(255, 255, 255, 0.22)';
     }
     if (this.isWarning()) {
-      return PhoneTheme.STATE_WARN;
+      return PhoneTheme.STATE_WARN_BG;
     }
-    if (this.isBaseline()) {
-      return PhoneTheme.BRAND_ACCENT;
+    if (this.isGated() || this.isLearning() || this.isCooldown()) {
+      return PhoneTheme.BRAND_ACCENT_BG;
     }
-    return PhoneTheme.BORDER_SUBTLE;
+    return PhoneTheme.STATE_OK_BG;
   }
 
-  private getRingColor(): string {
-    if (this.isEmergency()) {
+  private pillText(): string {
+    if (this.isCritical()) {
       return PhoneTheme.TEXT_ON_DARK;
     }
     if (this.isWarning()) {
-      return PhoneTheme.STATE_WARN;
+      return PhoneTheme.STATE_WARN_TEXT;
     }
-    if (this.isBaseline()) {
+    if (this.isGated() || this.isLearning() || this.isCooldown()) {
       return PhoneTheme.BRAND_ACCENT;
     }
-    return PhoneTheme.STATE_OK;
+    return PhoneTheme.STATE_OK_TEXT;
   }
 
-  private getRingBgColor(): string {
-    if (this.isEmergency()) {
-      return 'rgba(255, 255, 255, 0.25)';
+  private drawSymptomBars(): void {
+    if (!this.barReady) {
+      return;
     }
-    return PhoneTheme.BG_MUTED;
+    const ctx: CanvasRenderingContext2D = this.barCtx;
+    const W: number = this.barW > 0 ? this.barW : 112;
+    const H: number = this.barH > 0 ? this.barH : 46;
+    ctx.clearRect(0, 0, W, H);
+
+    const crit: boolean = this.isCritical();
+    const warn: boolean = this.isWarning();
+    const heights: number[] = crit
+      ? [0.46, 0.78, 0.62, 0.94, 0.72, 0.98, 0.84, 0.64, 0.88, 0.74]
+      : (warn
+        ? [0.35, 0.56, 0.44, 0.78, 0.64, 0.82, 0.54, 0.48, 0.68, 0.42]
+        : [0.38, 0.64, 0.46, 0.82, 0.72, 0.48, 0.62, 0.52, 0.78, 0.44]);
+
+    const colors: string[] = crit
+      ? ['#FFFFFF', '#FCA5A5', '#FFFFFF', '#FECACA', '#FFFFFF', '#FFFFFF', '#FCA5A5', '#FFFFFF', '#FECACA', '#FFFFFF']
+      : ['#111318', '#EF4444', '#111318', '#EF4444', '#111318', '#2A82F0', '#111318', '#EF4444', '#111318', '#111318'];
+
+    const count: number = heights.length;
+    const barWidth: number = 3.5;
+    const step: number = (W - barWidth) / (count - 1);
+
+    ctx.lineCap = 'round';
+    ctx.lineWidth = barWidth;
+
+    for (let i: number = 0; i < count; i++) {
+      const x: number = barWidth / 2 + i * step;
+      const barLen: number = Math.max(10, heights[i] * (H - 8));
+      const yTop: number = (H - barLen) / 2;
+      const yBot: number = yTop + barLen;
+
+      ctx.strokeStyle = colors[i];
+      ctx.beginPath();
+      ctx.moveTo(x, yTop);
+      ctx.lineTo(x, yBot);
+      ctx.stroke();
+    }
   }
 
   build() {
     Column({ space: 12 }) {
-      // Top Row: Status badge + Phase chip + time
-      Row() {
-        Row({ space: 4 }) {
-          Circle({ width: 5, height: 5 })
-            .fill(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : (this.isBaseline() ? PhoneTheme.BRAND_ACCENT : PhoneTheme.STATE_OK_TEXT)))
-          Text(statusBadgeText(this.vitals))
-            .fontSize(PhoneTheme.FONT_MICRO)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : (this.isBaseline() ? PhoneTheme.BRAND_ACCENT : PhoneTheme.STATE_OK_TEXT)))
-        }
-        .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.2)' : (this.isWarning() ? PhoneTheme.STATE_WARN_BG : (this.isBaseline() ? PhoneTheme.BRAND_ACCENT_BG : PhoneTheme.STATE_OK_BG)))
-        .borderRadius(PhoneTheme.PILL_RADIUS)
-        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-
-        Text(VitalsEngine.getPhaseShort(this.vitals.phase))
-          .fontSize(PhoneTheme.FONT_MICRO)
+      // Top row: Title & status badge
+      Row({ space: 8 }) {
+        Text(this.vitals.phase === 3 ? 'Symptom Risk' : 'Symptom Score')
+          .fontSize(PhoneTheme.FONT_SUBTITLE)
           .fontWeight(FontWeight.Medium)
-          .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_SECONDARY)
-          .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.16)' : PhoneTheme.BG_SUBTLE)
-          .borderRadius(PhoneTheme.PILL_RADIUS)
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .margin({ left: 6 })
+          .fontColor(this.isCritical() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_SECONDARY)
+          .layoutWeight(1)
 
-        Blank()
-
-        Text(this.currentTime)
+        Text(statusBadgeLabel(this.vitals))
           .fontSize(PhoneTheme.FONT_CAPTION)
-          .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.75)' : PhoneTheme.TEXT_TERTIARY)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.pillText())
+          .backgroundColor(this.pillBg())
+          .borderRadius(PhoneTheme.PILL_RADIUS)
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
-      // Main: Symptom risk % or 75-min baseline progress + Ring Gauge
-      Row({ space: 14 }) {
+      // Focal split row: Big score on left + vertical symptom bars on right
+      Row({ space: 10 }) {
         Column({ space: 2 }) {
-          Text('HYPO SYMPTOM RISK')
-            .fontSize(PhoneTheme.FONT_MICRO)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_TERTIARY)
+          Row({ space: 5 }) {
+            Text(this.vitals.phase === 3 ? `${this.vitals.symptomRiskPct}` : `${this.vitals.heuristicScore.toFixed(1)}`)
+              .fontSize(PhoneTheme.FONT_HERO)
+              .fontWeight(FontWeight.Bold)
+              .letterSpacing(-1.2)
+              .fontFeature('"tnum" on')
+              .fontColor(this.isCritical() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
 
-          if (this.isBaseline()) {
-            Row({ space: 4 }) {
-              Text(`${this.vitals.baselineMinutes}`)
-                .fontSize(PhoneTheme.FONT_HERO)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_PRIMARY)
-              Text('/ 75 min')
-                .fontSize(PhoneTheme.FONT_BODY)
-                .fontColor(PhoneTheme.TEXT_MUTED)
-                .margin({ bottom: 4 })
-            }
-            .alignItems(VerticalAlign.Bottom)
-          } else {
-            Row({ space: 4 }) {
-              Text(`${this.vitals.symptomRiskPct}%`)
-                .fontSize(PhoneTheme.FONT_HERO)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
-
-              Text(this.vitals.isSedentary ? 'symptom risk' : 'paused')
-                .fontSize(PhoneTheme.FONT_BODY)
-                .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_MUTED)
-                .margin({ bottom: 4 })
-            }
-            .alignItems(VerticalAlign.Bottom)
+            Text(this.vitals.phase === 3 ? '%' : 'score')
+              .fontSize(PhoneTheme.FONT_SUBTITLE)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.isCritical() ? 'rgba(255,255,255,0.88)' : PhoneTheme.TEXT_SECONDARY)
+              .margin({ bottom: 6 })
           }
+          .alignItems(VerticalAlign.Bottom)
 
-          Text(`Checks: ${this.vitals.streakCount}/${this.vitals.streakRequired} in a row • Alerts: ${this.vitals.alertsTonight}/2`)
+          Text(
+            this.vitals.phase === 3
+              ? `${this.vitals.streakCount}/${this.vitals.streakRequired} · ${phenotypeShortLabel(this.vitals.phenotype)} · ${this.vitals.alertsTonight}/2`
+              : `Cutoff ${this.vitals.threshold.toFixed(1)} · ${this.vitals.streakCount}/${this.vitals.streakRequired} · ${this.vitals.alertsTonight}/2`
+          )
             .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.TEXT_MUTED))
+            .fontFeature('"tnum" on')
+            .fontColor(this.isCritical() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_SECONDARY)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
-        Column({ space: 2 }) {
-          Stack({ alignContent: Alignment.Center }) {
-            Progress({
-              value: this.isBaseline()
-                ? Math.round((this.vitals.baselineMinutes / VitalsEngine.BASELINE_TOTAL_MINUTES) * 100)
-                : this.vitals.symptomRiskPct,
-              total: 100,
-              type: ProgressType.Ring
-            })
-              .color(this.getRingColor())
-              .backgroundColor(this.getRingBgColor())
-              .style({ strokeWidth: 6 })
-              .width(56)
-              .height(56)
+        Canvas(this.barCtx)
+          .width(114)
+          .height(46)
+          .onAreaChange((_o: Area, n: Area) => {
+            const w: number = Number(n.width);
+            const h: number = Number(n.height);
+            if (w > 0 && h > 0) {
+              this.barW = w;
+              this.barH = h;
+              this.drawSymptomBars();
+            }
+          })
+          .onReady(() => {
+            this.barReady = true;
+            this.drawSymptomBars();
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
 
-            Text(this.isBaseline() ? `${this.vitals.baselineMinutes}m` : `${this.vitals.symptomRiskPct}`)
-              .fontSize(15)
+      // 75-min Baseline / Phase 3 1D-CNN live readout / Motion Gate / Alert status note
+      if (this.isLearning()) {
+        Column({ space: 5 }) {
+          Row() {
+            Text('75m baseline')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(PhoneTheme.BRAND_ACCENT)
+              .layoutWeight(1)
+            Text(`${this.vitals.baselineMinutes}/75m`)
+              .fontSize(PhoneTheme.FONT_CAPTION)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
+              .fontFeature('"tnum" on')
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
           }
-          .width(56)
-          .height(56)
-          Text(this.isBaseline() ? 'Setup' : 'Risk')
-            .fontSize(PhoneTheme.FONT_MICRO)
-            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_MUTED)
+          .width('100%')
+
+          Progress({ value: this.vitals.baselineMinutes, total: VitalsEngine.BASELINE_TOTAL_MINUTES, type: ProgressType.Linear })
+            .width('100%')
+            .height(6)
+            .color(PhoneTheme.BRAND_ACCENT)
+            .backgroundColor('rgba(255,255,255,0.65)')
         }
-        .alignItems(HorizontalAlign.Center)
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .padding({ top: 2, bottom: 2 })
-
-      Divider()
-        .color(this.isEmergency() ? 'rgba(255,255,255,0.2)' : PhoneTheme.BORDER_LIGHT)
-        .strokeWidth(1)
-
-      // Plain-English explanation
-      Text(heroSentence(this.vitals))
-        .fontSize(PhoneTheme.FONT_BODY)
-        .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
         .width('100%')
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-      // Driver detail chip
-      Row({ space: 6 }) {
-        Text(VitalsEngine.getPhenotypeLabel(this.vitals.phenotype))
-          .fontSize(PhoneTheme.FONT_MICRO)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_MUTED)
-          .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.16)' : PhoneTheme.BG_SUBTLE)
-          .borderRadius(PhoneTheme.PILL_RADIUS)
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-
-        Text(this.vitals.reasonSummary)
-          .fontSize(PhoneTheme.FONT_MICRO)
-          .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_MUTED)
-          .layoutWeight(1)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      if (this.vitals.tcnnEma !== undefined && this.vitals.tcnnThr !== undefined) {
+        .padding(10)
+        .backgroundColor('rgba(255,255,255,0.55)')
+        .borderRadius(14)
+      } else if (this.vitals.phase === 3 && this.vitals.tcnnEma !== undefined && this.vitals.tcnnThr !== undefined) {
         Row({ space: 6 }) {
-          Text(`1D-CNN ${this.vitals.tcnnSlotsFilled ?? 12}/12 slots`)
+          Text(`CNN ${this.vitals.tcnnSlotsFilled ?? 12}/12`)
             .fontSize(PhoneTheme.FONT_MICRO)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_ACCENT)
+            .fontColor(this.isCritical() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.BRAND_ACCENT)
 
-          Text(`EMA ${this.vitals.tcnnEma.toFixed(2)} vs ${this.vitals.tcnnThr.toFixed(2)}`)
+          Text(`EMA ${this.vitals.tcnnEma.toFixed(2)} / ${this.vitals.tcnnThr.toFixed(2)}`)
             .fontSize(PhoneTheme.FONT_MICRO)
-            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_SECONDARY)
+            .fontFeature('"tnum" on')
+            .fontColor(this.isCritical() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_SECONDARY)
             .layoutWeight(1)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-          if (this.vitals.tcnnRawLogit !== undefined) {
-            Text(`z ${this.vitals.tcnnRawLogit.toFixed(2)}`)
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_TERTIARY)
-          }
         }
         .width('100%')
-        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-        .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.16)' : PhoneTheme.BG_SUBTLE)
-        .borderRadius(PhoneTheme.TILE_RADIUS)
+        .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+        .backgroundColor(this.isCritical() ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.55)')
+        .borderRadius(12)
+      } else if (this.isGated() || this.isWarning() || this.isCritical() || this.isCooldown()) {
+        Text(heroHeadline(this.vitals))
+          .fontSize(PhoneTheme.FONT_CAPTION)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.isCritical() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
+          .width('100%')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
 
-      if (this.isEmergency()) {
+      // Crisis & Warning controls (stroke-free pills)
+      if (this.isCritical()) {
+        if (this.smnSentTime.length > 0) {
+          Text(`SMS sent · ${this.smnSentTime}`)
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor('rgba(255,255,255,0.92)')
+            .width('100%')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+
         Row({ space: 10 }) {
           Button("I'm awake")
             .fontSize(PhoneTheme.FONT_SUBTITLE)
             .fontWeight(FontWeight.Bold)
-            .height(48)
+            .height(44)
             .layoutWeight(1)
             .backgroundColor(PhoneTheme.BG_CARD)
-            .fontColor(PhoneTheme.STATE_CRIT)
-            .borderRadius(PhoneTheme.TILE_RADIUS)
+            .fontColor(PhoneTheme.STATE_CRIT_DARK)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
             .onClick(() => {
               this.onMarkWithThem();
             })
 
-          Button('Call caregiver')
+          Button('Call')
             .fontSize(PhoneTheme.FONT_SUBTITLE)
             .fontWeight(FontWeight.Bold)
-            .height(48)
+            .height(44)
             .layoutWeight(1)
-            .backgroundColor('rgba(255,255,255,0.2)')
+            .backgroundColor('rgba(255,255,255,0.22)')
             .fontColor(PhoneTheme.TEXT_ON_DARK)
-            .border({ width: 1.5, color: PhoneTheme.TEXT_ON_DARK, radius: PhoneTheme.TILE_RADIUS })
-            .borderRadius(PhoneTheme.TILE_RADIUS)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
             .onClick(() => {
               this.onCallNow();
             })
         }
         .width('100%')
-        .margin({ top: 2 })
       } else if (this.isWarning()) {
-        Button('Check sleeper now')
-          .fontSize(PhoneTheme.FONT_BODY)
-          .fontWeight(FontWeight.Bold)
-          .height(44)
-          .width('100%')
-          .backgroundColor(PhoneTheme.STATE_WARN)
-          .fontColor(PhoneTheme.TEXT_ON_DARK)
-          .borderRadius(PhoneTheme.TILE_RADIUS)
-          .onClick(() => {
-            this.onCallNow();
-          })
+        Row({ space: 8 }) {
+          Button('Log check')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontWeight(FontWeight.Bold)
+            .height(38)
+            .layoutWeight(1)
+            .backgroundColor(PhoneTheme.BRAND_PRIMARY)
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
+            .onClick(() => {
+              this.onQuickCheck();
+            })
+
+          Button('Call')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontWeight(FontWeight.Bold)
+            .height(38)
+            .padding({ left: 16, right: 16 })
+            .backgroundColor(PhoneTheme.BG_CARD)
+            .fontColor(PhoneTheme.TEXT_PRIMARY)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
+            .onClick(() => {
+              this.onCallNow();
+            })
+        }
+        .width('100%')
       }
     }
     .width('100%')
     .padding(PhoneTheme.CARD_PADDING)
-    .backgroundColor(this.getCardBg())
-    .borderWidth(1)
-    .borderColor(this.getBorderColor())
     .borderRadius(PhoneTheme.CARD_RADIUS)
-    .shadow({ radius: 10, color: 'rgba(15, 23, 42, 0.06)', offsetY: 2 })
+    .linearGradient(
+      this.isCritical()
+        ? { angle: 165, colors: [[PhoneTheme.STATE_CRIT_DARK, 0.0], ['#B91C1C', 1.0]] }
+        : { angle: 165, colors: [[PhoneTheme.HERO_SKY_TOP, 0.0], [PhoneTheme.HERO_SKY_BOT, 1.0]] }
+    )
+    .shadow({ radius: 14, color: 'rgba(17, 19, 24, 0.06)', offsetY: 4 })
   }
 }

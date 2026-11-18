@@ -1,9 +1,12 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Screen 3: Profile Setup, Phase 1-3 Calibration Progress, and Caregiver Settings.
+ * Phone Companion — Screen 4: Guardian Settings & Caregiver SMS (concise copy, stroke-free pills).
+ * Bound directly to DetectionPhase, BodyPhenotype, GateProgress, and EmergencyContact (7676da5).
  */
 
-import { BodyPhenotype, DetectionPhase, GateProgress, VitalsEngine } from '../../models/VitalsModel';
+import { EmergencyContact, HistoryRepository } from '../../models/HistoryModel';
+import { BodyPhenotype, DetectionPhase, GateProgress } from '../../models/VitalsModel';
+import { phaseDescription, phenotypeShortLabel } from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
@@ -11,231 +14,150 @@ export struct FamilyView {
   @Link caregiverName: string;
   @Link caregiverPhone: string;
   @Link smnEnabled: boolean;
+  @Link activePhase: DetectionPhase;
+  @Link phenotype: BodyPhenotype;
   @Prop smnLastSent: string = '';
-  @Prop phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
-  @Prop activePhase: DetectionPhase = 1;
-  @Prop gateProgress: GateProgress = {
-    buzzLinkedPricks: 2,
-    confirmedLows: 0,
-    fineNights: 6,
-    personalLine: 3.7,
-    hasPersonalLine: false,
-    isCnnUnlocked: false,
-    isA2Personalized: false
-  };
-  @Prop ageYears: number = 26;
-  @Prop t1dYears: number = 8;
+  @Prop isEmergency: boolean = false;
+  @Prop gateProgress: GateProgress = HistoryRepository.getGateProgress();
+
   @State guardianMasterEnabled: boolean = true;
-  @State watchVibrationEnabled: boolean = true;
+  @State baseline75mEnabled: boolean = true;
   @State scheduleStartTime: string = '22:00';
   @State scheduleEndTime: string = '06:00';
+  @State contactsList: EmergencyContact[] = [];
+  @State testSmsBanner: string = '';
   onCallNow: () => void = () => {};
   onToggleSmn: (isOn: boolean) => void = () => {};
   onSendTestSmn: () => void = () => {};
-  onSelectPhenotype: (p: BodyPhenotype) => void = () => {};
   onSelectPhase: (phase: DetectionPhase) => void = () => {};
+  onSelectPhenotype: (phenotype: BodyPhenotype) => void = () => {};
+
+  aboutToAppear(): void {
+    this.contactsList = HistoryRepository.getContacts();
+  }
+
+  private phaseUnlockTag(phase: DetectionPhase): string {
+    if (phase === 1) {
+      return 'Day 1';
+    }
+    if (phase === 2) {
+      return this.gateProgress.hasPersonalLine ? 'Unlocked' : `${this.gateProgress.buzzLinkedPricks}/3`;
+    }
+    return this.gateProgress.isCnnUnlocked
+      ? 'Unlocked'
+      : `${this.gateProgress.confirmedLows}/1·${this.gateProgress.fineNights}/10`;
+  }
+
+  @Builder
+  phaseButton(phase: DetectionPhase, title: string) {
+    Button() {
+      Column({ space: 2 }) {
+        Text(title)
+          .fontSize(PhoneTheme.FONT_CAPTION)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.activePhase === phase ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
+
+        Text(this.phaseUnlockTag(phase))
+          .fontSize(PhoneTheme.FONT_MICRO)
+          .fontFeature('"tnum" on')
+          .fontColor(this.activePhase === phase ? 'rgba(255,255,255,0.82)' : PhoneTheme.TEXT_MUTED)
+      }
+      .alignItems(HorizontalAlign.Center)
+    }
+    .height(46)
+    .layoutWeight(1)
+    .backgroundColor(this.activePhase === phase ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_INSET)
+    .borderRadius(16)
+    .onClick(() => {
+      this.onSelectPhase(phase);
+    })
+  }
 
   build() {
     Scroll() {
-      Column({ space: 12 }) {
-        Column({ space: 2 }) {
-          Row() {
-            Text('Guardian & Profile')
-              .fontSize(PhoneTheme.FONT_TITLE)
+      Column({ space: 14 }) {
+        Row() {
+          Column({ space: 2 }) {
+            Text('Guardian')
+              .fontSize(28)
               .fontWeight(FontWeight.Bold)
+              .letterSpacing(-0.5)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
-              .layoutWeight(1)
 
-            Text(this.guardianMasterEnabled ? 'Armed' : 'Paused')
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.guardianMasterEnabled ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_TERTIARY)
-              .backgroundColor(this.guardianMasterEnabled ? PhoneTheme.STATE_OK_BG : PhoneTheme.BG_MUTED)
-              .borderRadius(PhoneTheme.PILL_RADIUS)
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            Text(`${this.scheduleStartTime}–${this.scheduleEndTime} · ${phenotypeShortLabel(this.phenotype)}`)
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontColor(PhoneTheme.TEXT_MUTED)
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
-          Text('75m baseline • 30m cooldown • Max 2 alerts/night')
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Text(this.guardianMasterEnabled ? 'Armed' : 'Paused')
             .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_MUTED)
-            .width('100%')
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.guardianMasterEnabled ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_MUTED)
+            .backgroundColor(this.guardianMasterEnabled ? PhoneTheme.STATE_OK_BG : PhoneTheme.BG_INSET)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
+            .padding({ left: 12, right: 12, top: 5, bottom: 5 })
         }
         .width('100%')
-        .padding({ left: 2, right: 2, top: 2 })
+        .alignItems(VerticalAlign.Center)
 
-        // 1. One-Time Setup (Body Response Type)
-        Column({ space: 10 }) {
+        // 1. Detection Model & Routing
+        Column({ space: 12 }) {
           Row() {
-            Text('Your Body Response')
+            Text('Detection')
               .fontSize(PhoneTheme.FONT_SECTION)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
               .layoutWeight(1)
-            Text(`Age ${this.ageYears} • T1D ${this.t1dYears}y`)
+
+            Text(phaseDescription(this.activePhase, this.gateProgress))
               .fontSize(PhoneTheme.FONT_CAPTION)
               .fontColor(PhoneTheme.TEXT_MUTED)
           }
           .width('100%')
 
           Row({ space: 8 }) {
-            Button('Adrenergic (3 checks)')
+            this.phaseButton(1, 'P1 Warm-Up')
+            this.phaseButton(2, 'P2 My Line')
+            this.phaseButton(3, 'P3 1D-CNN')
+          }
+          .width('100%')
+
+          Row({ space: 8 }) {
+            Button('Adrenergic (3x)')
               .fontSize(PhoneTheme.FONT_CAPTION)
-              .fontWeight(FontWeight.Bold)
-              .height(40)
+              .fontWeight(this.phenotype === BodyPhenotype.ADRENERGIC ? FontWeight.Bold : FontWeight.Medium)
+              .height(38)
               .layoutWeight(1)
-              .backgroundColor(this.phenotype === BodyPhenotype.ADRENERGIC ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_SUBTLE)
+              .backgroundColor(this.phenotype === BodyPhenotype.ADRENERGIC ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_INSET)
               .fontColor(this.phenotype === BodyPhenotype.ADRENERGIC ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .borderRadius(19)
               .onClick(() => {
                 this.onSelectPhenotype(BodyPhenotype.ADRENERGIC);
               })
 
-            Button('Blunted (2 checks)')
+            Button('Blunted (2x)')
               .fontSize(PhoneTheme.FONT_CAPTION)
-              .fontWeight(FontWeight.Bold)
-              .height(40)
+              .fontWeight(this.phenotype === BodyPhenotype.BRADYCARDIC ? FontWeight.Bold : FontWeight.Medium)
+              .height(38)
               .layoutWeight(1)
-              .backgroundColor(this.phenotype === BodyPhenotype.BRADYCARDIC ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_SUBTLE)
+              .backgroundColor(this.phenotype === BodyPhenotype.BRADYCARDIC ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_INSET)
               .fontColor(this.phenotype === BodyPhenotype.BRADYCARDIC ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .borderRadius(19)
               .onClick(() => {
                 this.onSelectPhenotype(BodyPhenotype.BRADYCARDIC);
               })
           }
           .width('100%')
 
-          Text(this.phenotype === BodyPhenotype.ADRENERGIC
-            ? 'Adrenergic: reacts with fast heart rate + shaking. Needs 3 high checks in a row (~15 min).'
-            : 'Blunted: quieter or flat pulse response. Needs 2 high checks in a row (~10 min).')
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_MUTED)
-            .width('100%')
-        }
-        .width('100%')
-        .padding(PhoneTheme.CARD_PADDING)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.CARD_RADIUS)
-
-        // 2. Phase 1 -> Phase 2 -> Phase 3 Learning Progress
-        Column({ space: 10 }) {
           Row() {
-            Text('Learning Phases')
-              .fontSize(PhoneTheme.FONT_SECTION)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-              .layoutWeight(1)
-            Text(VitalsEngine.getPhaseName(this.activePhase))
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.BRAND_ACCENT)
-              .backgroundColor(PhoneTheme.BRAND_ACCENT_BG)
-              .borderRadius(PhoneTheme.PILL_RADIUS)
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          }
-          .width('100%')
-
-          Row({ space: 6 }) {
-            Button('P1 Warm-Up')
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .height(34)
-              .layoutWeight(1)
-              .backgroundColor(this.activePhase === 1 ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_SUBTLE)
-              .fontColor(this.activePhase === 1 ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
-              .onClick(() => {
-                this.onSelectPhase(1);
-              })
-
-            Button('P2 My Line')
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .height(34)
-              .layoutWeight(1)
-              .backgroundColor(this.activePhase === 2 ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_SUBTLE)
-              .fontColor(this.activePhase === 2 ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
-              .onClick(() => {
-                this.onSelectPhase(2);
-              })
-
-            Button('P3 1D-CNN')
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontWeight(FontWeight.Bold)
-              .height(34)
-              .layoutWeight(1)
-              .backgroundColor(this.activePhase === 3 ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_SUBTLE)
-              .fontColor(this.activePhase === 3 ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
-              .onClick(() => {
-                this.onSelectPhase(3);
-              })
-          }
-          .width('100%')
-
-          Column({ space: 4 }) {
-            Row() {
-              Text('Gate 1: Personal cutoff (Phase 2)')
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_SECONDARY)
-                .layoutWeight(1)
-              Text(`${Math.min(3, this.gateProgress.buzzLinkedPricks)}/3 buzz pricks`)
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.gateProgress.hasPersonalLine ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_MUTED)
-            }
-            .width('100%')
-
-            Progress({ value: Math.min(3, this.gateProgress.buzzLinkedPricks), total: 3, type: ProgressType.Linear })
-              .width('100%')
-              .color(this.gateProgress.hasPersonalLine ? PhoneTheme.STATE_OK : PhoneTheme.BRAND_ACCENT)
-              .backgroundColor(PhoneTheme.BG_SUBTLE)
-          }
-          .width('100%')
-
-          Column({ space: 4 }) {
-            Row() {
-              Text('Gate 2: 60-min 1D-CNN (Phase 3)')
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_SECONDARY)
-                .layoutWeight(1)
-              Text(`${Math.min(1, this.gateProgress.confirmedLows)}/1 low • ${Math.min(10, this.gateProgress.fineNights)}/10 fine`)
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.gateProgress.isCnnUnlocked ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_MUTED)
-            }
-            .width('100%')
-
-            Progress({
-              value: Math.min(10, this.gateProgress.fineNights) + (this.gateProgress.confirmedLows > 0 ? 1 : 0),
-              total: 11,
-              type: ProgressType.Linear
-            })
-              .width('100%')
-              .color(this.gateProgress.isCnnUnlocked ? PhoneTheme.STATE_OK : PhoneTheme.BRAND_ACCENT)
-              .backgroundColor(PhoneTheme.BG_SUBTLE)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(PhoneTheme.CARD_PADDING)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.CARD_RADIUS)
-
-        // 3. Night watch window & watch vibration
-        Column({ space: 12 }) {
-          Row() {
-            Column({ space: 0 }) {
-              Text('Night watch')
-                .fontSize(PhoneTheme.FONT_SECTION)
-                .fontWeight(FontWeight.Bold)
+            Column({ space: 1 }) {
+              Text('Night Watch')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
                 .fontColor(PhoneTheme.TEXT_PRIMARY)
-              Text(`${this.scheduleStartTime} – ${this.scheduleEndTime}`)
+              Text(`${this.scheduleStartTime} – ${this.scheduleEndTime} · Max 2/night`)
                 .fontSize(PhoneTheme.FONT_CAPTION)
                 .fontColor(PhoneTheme.TEXT_MUTED)
             }
@@ -243,7 +165,7 @@ export struct FamilyView {
             .layoutWeight(1)
 
             Toggle({ type: ToggleType.Switch, isOn: this.guardianMasterEnabled })
-              .selectedColor(PhoneTheme.STATE_OK)
+              .selectedColor(PhoneTheme.BRAND_PRIMARY)
               .width(46)
               .height(26)
               .onChange((isOn: boolean) => {
@@ -253,20 +175,25 @@ export struct FamilyView {
           .width('100%')
           .alignItems(VerticalAlign.Center)
 
-          Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
-
           Row() {
-            Text('Watch wrist vibration')
-              .fontSize(PhoneTheme.FONT_BODY)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-              .layoutWeight(1)
+            Column({ space: 1 }) {
+              Text('75m Baseline')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Text('Learns resting HR · 30m cooldown')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
 
-            Toggle({ type: ToggleType.Switch, isOn: this.watchVibrationEnabled })
+            Toggle({ type: ToggleType.Switch, isOn: this.baseline75mEnabled })
               .selectedColor(PhoneTheme.BRAND_ACCENT)
-              .width(42)
-              .height(24)
+              .width(46)
+              .height(26)
               .onChange((isOn: boolean) => {
-                this.watchVibrationEnabled = isOn;
+                this.baseline75mEnabled = isOn;
               })
           }
           .width('100%')
@@ -275,18 +202,23 @@ export struct FamilyView {
         .width('100%')
         .padding(PhoneTheme.CARD_PADDING)
         .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
         .borderRadius(PhoneTheme.CARD_RADIUS)
+        .shadow({ radius: 12, color: 'rgba(17, 19, 24, 0.04)', offsetY: 3 })
 
-        // 4. Caregiver & Alert Dispatch
+        // 2. Caregiver & SMS Escalation
         Column({ space: 12 }) {
           Row() {
-            Text('Caregiver alerts (max 2/night)')
-              .fontSize(PhoneTheme.FONT_SECTION)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-              .layoutWeight(1)
+            Column({ space: 1 }) {
+              Text('Caregiver SMS')
+                .fontSize(PhoneTheme.FONT_SECTION)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Text('Huawei Cloud SMN')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
 
             Toggle({ type: ToggleType.Switch, isOn: this.smnEnabled })
               .selectedColor(PhoneTheme.BRAND_ACCENT)
@@ -300,88 +232,118 @@ export struct FamilyView {
           .width('100%')
           .alignItems(VerticalAlign.Center)
 
-          Row({ space: 12 }) {
-            Stack({ alignContent: Alignment.Center }) {
-              Circle({ width: 40, height: 40 })
-                .fill(PhoneTheme.BRAND_PRIMARY)
-              Text(this.caregiverName.length > 0 ? this.caregiverName.substring(0, 1) : 'M')
-                .fontSize(16)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_ON_DARK)
-            }
-            .width(40)
-            .height(40)
+          Column({ space: 8 }) {
+            ForEach(this.contactsList, (contact: EmergencyContact) => {
+              Row({ space: 12 }) {
+                Stack({ alignContent: Alignment.Center }) {
+                  Circle({ width: 38, height: 38 })
+                    .fill(contact.isPrimary ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_CARD)
 
-            Column({ space: 0 }) {
-              Text(this.caregiverName)
-                .fontSize(PhoneTheme.FONT_BODY)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_PRIMARY)
+                  Text(contact.name.length > 0 ? contact.name.substring(0, 1) : 'C')
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(contact.isPrimary ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
+                }
+                .width(38)
+                .height(38)
+
+                Column({ space: 1 }) {
+                  Text(contact.name)
+                    .fontSize(PhoneTheme.FONT_BODY)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(PhoneTheme.TEXT_PRIMARY)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                  Text(contact.phone)
+                    .fontSize(PhoneTheme.FONT_CAPTION)
+                    .fontColor(PhoneTheme.TEXT_MUTED)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+
+                if (contact.isPrimary) {
+                  Button() {
+                    SymbolGlyph($r('sys.symbol.phone_fill'))
+                      .fontSize(15)
+                      .fontColor([PhoneTheme.TEXT_ON_DARK])
+                  }
+                  .width(38)
+                  .height(38)
+                  .backgroundColor(this.isEmergency ? PhoneTheme.STATE_CRIT_DARK : PhoneTheme.BRAND_PRIMARY)
+                  .borderRadius(19)
+                  .onClick(() => {
+                    this.onCallNow();
+                  })
+                } else {
+                  Text(contact.smnEnabled ? 'SMN' : 'Off')
+                    .fontSize(PhoneTheme.FONT_MICRO)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(contact.smnEnabled ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_MUTED)
+                    .backgroundColor(contact.smnEnabled ? PhoneTheme.STATE_OK_BG : PhoneTheme.BG_CARD)
+                    .borderRadius(PhoneTheme.PILL_RADIUS)
+                    .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                }
+              }
+              .width('100%')
+              .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+              .backgroundColor(PhoneTheme.BG_INSET)
+              .borderRadius(16)
+              .alignItems(VerticalAlign.Center)
+            }, (contact: EmergencyContact) => contact.id)
+          }
+          .width('100%')
+
+          Button('Send test SMS')
+            .fontSize(PhoneTheme.FONT_BODY)
+            .fontWeight(FontWeight.Bold)
+            .height(44)
+            .width('100%')
+            .backgroundColor(PhoneTheme.BRAND_PRIMARY)
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
+            .borderRadius(22)
+            .onClick(() => {
+              this.onSendTestSmn();
+              this.testSmsBanner = `Test SMS sent · ${this.caregiverPhone}`;
+            })
+
+          if (this.testSmsBanner.length > 0 || this.smnLastSent.length > 0) {
+            Row({ space: 6 }) {
+              SymbolGlyph($r('sys.symbol.checkmark_circle_fill'))
+                .fontSize(13)
+                .fontColor([PhoneTheme.STATE_OK_TEXT])
+
+              Text(
+                this.testSmsBanner.length > 0
+                  ? `${this.testSmsBanner} · ${this.smnLastSent}`
+                  : `SMS sent · ${this.smnLastSent}`
+              )
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.STATE_OK_TEXT)
+                .layoutWeight(1)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-              Text(this.caregiverPhone)
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_MUTED)
             }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
-
-            Button('Call')
-              .fontSize(PhoneTheme.FONT_BODY)
-              .fontWeight(FontWeight.Bold)
-              .height(48)
-              .padding({ left: 18, right: 18 })
-              .backgroundColor(PhoneTheme.BRAND_PRIMARY)
-              .fontColor(PhoneTheme.TEXT_ON_DARK)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
-              .onClick(() => {
-                this.onCallNow();
-              })
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
-
-          Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
-
-          Row({ space: 10 }) {
-            Button('Send test SMS')
-              .fontSize(PhoneTheme.FONT_BODY)
-              .fontWeight(FontWeight.Bold)
-              .height(44)
-              .layoutWeight(1)
-              .backgroundColor(PhoneTheme.BG_CARD)
-              .borderWidth(1)
-              .borderColor(PhoneTheme.BORDER_SUBTLE)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-              .borderRadius(PhoneTheme.TILE_RADIUS)
-              .onClick(() => {
-                this.onSendTestSmn();
-              })
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
-
-          if (this.smnLastSent.length > 0) {
-            Text(`Last test sent ${this.smnLastSent}`)
-              .fontSize(PhoneTheme.FONT_CAPTION)
-              .fontColor(PhoneTheme.TEXT_MUTED)
-              .width('100%')
-              .textAlign(TextAlign.End)
+            .width('100%')
+            .padding(10)
+            .backgroundColor(PhoneTheme.STATE_OK_BG)
+            .borderRadius(12)
           }
         }
         .width('100%')
         .padding(PhoneTheme.CARD_PADDING)
         .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
         .borderRadius(PhoneTheme.CARD_RADIUS)
+        .shadow({ radius: 12, color: 'rgba(17, 19, 24, 0.04)', offsetY: 3 })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 8, bottom: 88 })
+      .padding({ left: 16, right: 16, top: 12, bottom: 104 })
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(PhoneTheme.BG_PAGE)
     .scrollBar(BarState.Off)
     .scrollable(ScrollDirection.Vertical)
   }

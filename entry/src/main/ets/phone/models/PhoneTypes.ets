@@ -3,6 +3,8 @@
  * Type definitions and interfaces for the Phone Companion module.
  */
 
+export type ScenarioPreset = 'calm' | 'motion' | 'baseline' | 'warning' | 'surge' | 'replay';
+
 export interface AuditEntry {
   time: string;
   message: string;
@@ -18,5 +20,5 @@ export interface TremorBand {
 
 export interface OvernightPoint {
   hour: string;
-  riskPct: number;
+  value: number;
 }

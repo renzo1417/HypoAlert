@@ -1,19 +1,13 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Live Physiological Symptom Biomarkers (Zero Skin Temp, Zero Fake Glucose):
- * 1. Heart Rate & Baseline Shift (PPG)
- * 2. Heart Calmness / HRV (RMSSD & SDNN ms)
- * 3. 8-12 Hz Wrist Tremor & Motion Gate
+ * Phone Companion — Asymmetric 1 + 2 Pastel Bento Overview Grid.
+ * Matches the reference wellness aesthetic:
+ * - Left tall Lavender card with smooth curved pulse/PPG area chart & dot markers
+ * - Right stacked Sage Green card (HRV RMSSD) + Warm Peach card (8-12 Hz Tremor & Motion Gate)
  */
 
 import { VitalsData, VitalsEngine } from '../../models/VitalsModel';
-import {
-  heartStatusLabel,
-  hrvColor,
-  hrvStatusLabel,
-  tremorColor,
-  tremorLabel
-} from '../utils/PhoneRiskUtils';
+import { hrvStatusLabel, tremorStatusLabel } from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
@@ -21,111 +15,247 @@ export struct PhoneMetricGrid {
   @Prop vitals: VitalsData = VitalsEngine.createInitialVitals();
   ppgContext: CanvasRenderingContext2D | null = null;
   onCanvasReady: () => void = () => {};
+  onCanvasResize: (w: number, h: number) => void = () => {};
+  onPrevSection: () => void = () => {};
+  onNextSection: () => void = () => {};
+
+  private formatDeltaHR(): string {
+    const sign: string = this.vitals.deltaHr > 0 ? '+' : '';
+    return `${sign}${this.vitals.deltaHr} ΔHR`;
+  }
 
   build() {
-    Column({ space: 10 }) {
-      Row({ space: 10 }) {
-        // Heart rate + PPG strip
-        Column({ space: 4 }) {
-          Text('Heart rate')
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_MUTED)
+    Column({ space: 12 }) {
+      // Overview header + < > circular controls
+      Row({ space: 8 }) {
+        Text('Overview')
+          .fontSize(PhoneTheme.FONT_SECTION)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(PhoneTheme.TEXT_PRIMARY)
+          .layoutWeight(1)
 
-          Row({ space: 3 }) {
-            Text(`${this.vitals.pulse}`)
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(PhoneTheme.TEXT_PRIMARY)
-            Text('bpm')
+        Row({ space: 8 }) {
+          Button() {
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(14)
+              .fontColor([PhoneTheme.TEXT_PRIMARY])
+          }
+          .width(34)
+          .height(34)
+          .backgroundColor(PhoneTheme.BG_CARD)
+          .borderRadius(17)
+          .shadow({ radius: 8, color: 'rgba(17, 19, 24, 0.05)', offsetY: 2 })
+          .onClick(() => {
+            this.onPrevSection();
+          })
+
+          Button() {
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(14)
+              .fontColor([PhoneTheme.TEXT_ON_DARK])
+          }
+          .width(34)
+          .height(34)
+          .backgroundColor(PhoneTheme.BRAND_PRIMARY)
+          .borderRadius(17)
+          .onClick(() => {
+            this.onNextSection();
+          })
+        }
+        .alignItems(VerticalAlign.Center)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      // 1 + 2 Asymmetric Pastel Bento Grid
+      Row({ space: 12 }) {
+        // Left Tall Lavender Bento Card (Pulse & PPG Curve)
+        Column({ space: 0 }) {
+          Column({ space: 4 }) {
+            Row() {
+              Text('Pulse')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .layoutWeight(1)
+
+              Stack({ alignContent: Alignment.Center }) {
+                Circle({ width: 34, height: 34 })
+                  .fill(PhoneTheme.BG_CARD)
+                SymbolGlyph($r('sys.symbol.heart_fill'))
+                  .fontSize(15)
+                  .fontColor([PhoneTheme.TEXT_PRIMARY])
+              }
+              .width(34)
+              .height(34)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+
+            Row({ space: 4 }) {
+              Text(`${this.vitals.pulse}`)
+                .fontSize(30)
+                .fontWeight(FontWeight.Bold)
+                .fontFeature('"tnum" on')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+
+              Text('bpm')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .margin({ bottom: 4 })
+            }
+            .alignItems(VerticalAlign.Bottom)
+
+            Text(`${this.formatDeltaHR()} · ${this.vitals.baselineMinutes >= 75 ? '75m base' : `${this.vitals.baselineMinutes}/75m`}`)
               .fontSize(PhoneTheme.FONT_CAPTION)
-              .fontColor(PhoneTheme.TEXT_MUTED)
-              .margin({ bottom: 2 })
+              .fontFeature('"tnum" on')
+              .fontColor(PhoneTheme.TEXT_SECONDARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .width('100%')
-          .alignItems(VerticalAlign.Bottom)
+          .padding({ left: 16, right: 14, top: 14 })
+          .alignItems(HorizontalAlign.Start)
+
+          Blank()
 
           if (this.ppgContext) {
             Canvas(this.ppgContext)
               .width('100%')
-              .height(32)
-              .backgroundColor(PhoneTheme.BG_SUBTLE)
-              .borderRadius(6)
+              .height(98)
+              .onAreaChange((_o: Area, n: Area) => {
+                const w: number = Number(n.width);
+                const h: number = Number(n.height);
+                if (w > 0 && h > 0) {
+                  this.onCanvasResize(w, h);
+                }
+              })
               .onReady(() => {
                 this.onCanvasReady();
               })
           }
-
-          Text(heartStatusLabel(this.vitals))
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_SECONDARY)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1)
-        .padding(12)
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.TILE_RADIUS)
-        .alignItems(HorizontalAlign.Start)
+        .height(236)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+        .clip(true)
+        .linearGradient({
+          angle: 170,
+          colors: [[PhoneTheme.BENTO_LAV_TOP, 0.0], [PhoneTheme.BENTO_LAV_BOT, 1.0]]
+        })
 
-        // HRV + Tremor/Motion stacked
-        Column({ space: 10 }) {
-          // HRV (Heart calmness: RMSSD / SDNN)
-          Row({ space: 8 }) {
-            Circle({ width: 6, height: 6 })
-              .fill(hrvColor(this.vitals.rmssd))
-            Column({ space: 1 }) {
-              Text('Heart calmness (HRV)')
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_MUTED)
-                .maxLines(1)
-              Text(`${this.vitals.rmssd} ms • ${hrvStatusLabel(this.vitals.rmssd)}`)
+        // Right 2 Stacked Pastel Bento Cards (Sage HRV + Peach Tremor/Motion)
+        Column({ space: 12 }) {
+          // Top Right: Sage Green (HRV · RMSSD)
+          Column({ space: 4 }) {
+            Row() {
+              Text('HRV')
                 .fontSize(PhoneTheme.FONT_BODY)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_PRIMARY)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .layoutWeight(1)
+
+              Stack({ alignContent: Alignment.Center }) {
+                Circle({ width: 32, height: 32 })
+                  .fill(PhoneTheme.BG_CARD)
+                SymbolGlyph($r('sys.symbol.waveform'))
+                  .fontSize(14)
+                  .fontColor([PhoneTheme.TEXT_PRIMARY])
+              }
+              .width(32)
+              .height(32)
             }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+
+            Row({ space: 4 }) {
+              Text(`${this.vitals.rmssd}`)
+                .fontSize(PhoneTheme.FONT_METRIC)
+                .fontWeight(FontWeight.Bold)
+                .fontFeature('"tnum" on')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+
+              Text('ms')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .margin({ bottom: 3 })
+            }
+            .alignItems(VerticalAlign.Bottom)
+
+            Text(`${hrvStatusLabel(this.vitals.rmssd, this.vitals.isSedentary)} · SDNN ${this.vitals.sdnn}`)
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontFeature('"tnum" on')
+              .fontColor(PhoneTheme.TEXT_SECONDARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .width('100%')
-          .padding(12)
-          .backgroundColor(PhoneTheme.BG_CARD)
-          .borderWidth(1)
-          .borderColor(PhoneTheme.BORDER_SUBTLE)
-          .borderRadius(PhoneTheme.TILE_RADIUS)
-          .alignItems(VerticalAlign.Center)
+          .height(112)
+          .padding({ left: 14, right: 12, top: 12, bottom: 12 })
+          .borderRadius(PhoneTheme.CARD_RADIUS)
+          .linearGradient({
+            angle: 170,
+            colors: [[PhoneTheme.BENTO_SAGE_TOP, 0.0], [PhoneTheme.BENTO_SAGE_BOT, 1.0]]
+          })
+          .alignItems(HorizontalAlign.Start)
 
-          // 8-12 Hz Tremor & Motion Gate
-          Row({ space: 8 }) {
-            Circle({ width: 6, height: 6 })
-              .fill(tremorColor(this.vitals.tremorIndex, this.vitals.isSedentary))
-            Column({ space: 1 }) {
-              Text('Wrist tremor & motion')
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_MUTED)
-                .maxLines(1)
-              Text(`${tremorLabel(this.vitals.tremorIndex, this.vitals.isSedentary)} • ${this.vitals.isSedentary ? 'Still' : 'Paused'}`)
+          // Bottom Right: Warm Peach (8-12 Hz Tremor & Motion Gate)
+          Column({ space: 4 }) {
+            Row() {
+              Text('Tremor')
                 .fontSize(PhoneTheme.FONT_BODY)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_PRIMARY)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .layoutWeight(1)
+
+              Stack({ alignContent: Alignment.Center }) {
+                Circle({ width: 32, height: 32 })
+                  .fill(PhoneTheme.BG_CARD)
+                SymbolGlyph($r('sys.symbol.flame_fill'))
+                  .fontSize(14)
+                  .fontColor([PhoneTheme.TEXT_PRIMARY])
+              }
+              .width(32)
+              .height(32)
             }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+
+            Row({ space: 4 }) {
+              Text(`${this.vitals.tremorIndex.toFixed(2)}`)
+                .fontSize(PhoneTheme.FONT_METRIC)
+                .fontWeight(FontWeight.Bold)
+                .fontFeature('"tnum" on')
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+
+              Text('TPI')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .margin({ bottom: 3 })
+            }
+            .alignItems(VerticalAlign.Bottom)
+
+            Text(`${tremorStatusLabel(this.vitals.tremorIndex, this.vitals.isSedentary)} · ${this.vitals.isSedentary ? 'Still' : 'Paused'}`)
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontColor(!this.vitals.isSedentary ? PhoneTheme.BRAND_ACCENT : PhoneTheme.TEXT_SECONDARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .width('100%')
-          .padding(12)
-          .backgroundColor(PhoneTheme.BG_CARD)
-          .borderWidth(1)
-          .borderColor(PhoneTheme.BORDER_SUBTLE)
-          .borderRadius(PhoneTheme.TILE_RADIUS)
-          .alignItems(VerticalAlign.Center)
+          .height(112)
+          .padding({ left: 14, right: 12, top: 12, bottom: 12 })
+          .borderRadius(PhoneTheme.CARD_RADIUS)
+          .linearGradient({
+            angle: 170,
+            colors: [[PhoneTheme.BENTO_PEACH_TOP, 0.0], [PhoneTheme.BENTO_PEACH_BOT, 1.0]]
+          })
+          .alignItems(HorizontalAlign.Start)
         }
         .layoutWeight(1)
+        .height(236)
       }
       .width('100%')
       .alignItems(VerticalAlign.Top)

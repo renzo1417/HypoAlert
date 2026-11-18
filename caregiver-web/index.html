@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HypoAlert · Caregiver Night Monitor</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111318'/%3E%3Cpath d='M4 16h5l3-7 5 14 4-9 3 2h4' fill='none' stroke='%23ffffff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="tcnn-bundle.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <!-- Simulated Huawei Cloud SMN SMS Toast (appears on sustained surge or SMS test) -->
+  <div id="sms-toast" class="sms-toast" role="status" aria-live="polite" hidden>
+    <div class="sms-toast-icon" aria-hidden="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    </div>
+    <div class="sms-toast-copy">
+      <div class="sms-toast-title">SMS to Maria Santos (+63 917 123 4567)</div>
+      <div id="sms-toast-body" class="sms-toast-body">HypoAlert: Renzo needs a bedside check. Fast pulse &amp; trembling continued.</div>
+    </div>
+    <button id="sms-toast-close" class="toast-close-btn" type="button" aria-label="Dismiss SMS alert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Top Web Navigation Bar -->
+  <header class="web-navbar">
+    <div class="nav-inner">
+      <div class="nav-brand-group">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12h4l2.5-6 4.5 12 3-7 2 1h4" />
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <span class="brand-name">HypoAlert Caregiver</span>
+          <span class="brand-sub">Family browser view · Maria Santos</span>
+        </div>
+        <div class="nav-divider" aria-hidden="true"></div>
+        <div class="patient-chip">
+          <span id="live-dot" class="dot dot-ok"></span>
+          <span>Watching <strong>Renzo</strong></span>
+          <span id="watch-link-label" class="chip-muted tnum">· Watch 86%</span>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <span id="clock-pill" class="nav-time-pill tnum">02:15 AM</span>
+
+        <div class="demo-anchor">
+          <button id="btn-demo-menu" class="btn-nav-soft" type="button" aria-expanded="false" aria-controls="demo-popover">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09c-.66 0-1.25.4-1.51 1z" />
+            </svg>
+            <span>Demo Scenario</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          <!-- Clean Presenter Popover (Hidden until Demo Scenario is clicked) -->
+          <div id="demo-popover" class="demo-popover" hidden>
+            <div class="popover-section-label">Night Scenarios</div>
+            <div class="preset-list">
+              <button class="preset-btn is-selected" data-preset="calm" type="button">1 · Quiet Sleep</button>
+              <button class="preset-btn" data-preset="motion" type="button">2 · Turn in Bed (No Alert)</button>
+              <button class="preset-btn" data-preset="baseline" type="button">3 · Learning Night Baseline</button>
+              <button class="preset-btn" data-preset="warning" type="button">4 · Early Restless Shift</button>
+              <button class="preset-btn is-danger" data-preset="surge" type="button">5 · Sustained Surge + SMS Alert</button>
+              <button class="preset-btn" data-preset="replay" type="button">6 · Replay c2s02_7 (Phase 3 1D-CNN)</button>
+            </div>
+
+            <div class="popover-section-label">Simulation Options</div>
+            <div class="sim-controls-row">
+              <button id="btn-sim-body" class="sim-pill-btn" type="button">Pattern: Typical</button>
+              <button id="btn-sim-link" class="sim-pill-btn" type="button">Phone Link: On</button>
+              <button id="btn-sim-phase" class="sim-pill-btn" type="button">Model: Phase 1</button>
+              <button id="btn-reset-night" class="sim-pill-btn" type="button">Reset Night (0/2)</button>
+            </div>
+
+            <div class="popover-section-label">Simulate Morning Sugar Check</div>
+            <div class="sim-prick-row">
+              <button id="btn-sim-low" class="sim-prick-btn is-low tnum" type="button">54 mg/dL (Low)</button>
+              <button id="btn-sim-fine" class="sim-prick-btn is-fine tnum" type="button">108 mg/dL (Normal)</button>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-nav-call" class="btn-nav-primary" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+          </svg>
+          <span>Call Bedside</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="web-shell">
+    <!-- Offline Sync Notice (only when phone bridge pauses) -->
+    <div id="offline-banner" class="offline-banner" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="7" y="2" width="10" height="20" rx="2" />
+        <path d="M12 18h.01" />
+      </svg>
+      <span>Phone connection is paused. Showing the last synced update — Renzo's watch still buzzes beside the bed if needed.</span>
+    </div>
+
+    <!-- Row 1: Primary Caregiver Hero + Bedside Response -->
+    <section class="web-row row-top" aria-label="Current Night Status and Bedside Response">
+      <article id="hero-card" class="hero-card">
+        <div class="hero-header-row">
+          <div class="hero-status-group">
+            <span id="hero-pill" class="status-pill state-ok">Sleeping Steady</span>
+            <span id="hero-sync-tag" class="hero-meta-tag tnum">Synced 1m ago (22:00–06:00)</span>
+          </div>
+        </div>
+
+        <div class="hero-body">
+          <div class="hero-text-col">
+            <h1 id="hero-headline" class="hero-headline">Renzo is sleeping steady</h1>
+            <p id="hero-explanation" class="hero-explanation">Calm heart rate and still rest. No signs of a nighttime drop.</p>
+
+            <div class="hero-metrics-inline">
+              <div class="hero-stat">
+                <span class="stat-label">Body State</span>
+                <div class="stat-value-wrap">
+                  <span id="hero-body-state" class="stat-value-sm">Calm</span>
+                </div>
+              </div>
+              <div class="hero-stat-sep" aria-hidden="true"></div>
+              <div class="hero-stat">
+                <span class="stat-label">Alerts Tonight</span>
+                <div class="stat-value-wrap tnum">
+                  <span id="hero-alerts-val" class="stat-value-sm">0 of 2 max</span>
+                </div>
+              </div>
+              <div class="hero-stat-sep" aria-hidden="true"></div>
+              <div class="hero-stat">
+                <span class="stat-label">Watch</span>
+                <div class="stat-value-wrap tnum">
+                  <span id="hero-watch-val" class="stat-value-sm">86% · Connected</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-visual-col">
+            <canvas id="hero-bars-canvas" width="210" height="88" aria-label="Calm overnight rhythm indicator"></canvas>
+          </div>
+        </div>
+
+        <div id="baseline-wrap" class="baseline-bar-card" hidden>
+          <div class="baseline-top">
+            <span>Learning tonight's calm resting baseline</span>
+            <span id="baseline-count" class="tnum">55 of 75 min</span>
+          </div>
+          <div class="baseline-track">
+            <div id="baseline-fill" class="baseline-fill"></div>
+          </div>
+        </div>
+
+        <div id="hero-crisis-bar" class="hero-crisis-bar" hidden>
+          <button id="btn-im-with-renzo" class="btn-crisis-white" type="button">I'm With Renzo — Clear Alert</button>
+          <button id="btn-hero-call" class="btn-crisis-ghost" type="button">Call Renzo's Bedside</button>
+        </div>
+      </article>
+
+      <!-- Right: Bedside Response Card -->
+      <aside class="panel-card bedside-panel" aria-label="Bedside Response">
+        <div class="panel-head">
+          <div>
+            <h2>Bedside Response</h2>
+            <p class="panel-sub">Renzo · Mate 70 Pro + Watch</p>
+          </div>
+          <span id="cloud-sync-pill" class="soft-chip ok-chip">Connected</span>
+        </div>
+
+        <div class="action-pair">
+          <button id="btn-call-bedside" class="btn-solid-dark" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+            <span>Call Renzo's Bedside</span>
+          </button>
+          <button id="btn-check-in" class="btn-soft-neutral" type="button">Mark Checked In</button>
+        </div>
+
+        <div class="info-stack">
+          <div class="info-row">
+            <div class="info-row-left">
+              <span class="info-k">SMS Alerts</span>
+              <span class="info-v tnum">Maria Santos (+63 917 123 4567)</span>
+            </div>
+            <button id="btn-preview-sms" class="mini-link-btn" type="button">Test SMS</button>
+          </div>
+
+          <div class="info-row">
+            <div class="info-row-left">
+              <span class="info-k">Morning Check</span>
+              <span id="prick-sync-text" class="info-v">Waiting for morning blood sugar check</span>
+            </div>
+            <span id="prick-sync-badge" class="mini-tag">Synced</span>
+          </div>
+
+          <div class="info-row">
+            <div class="info-row-left">
+              <span class="info-k">Auto-Alert</span>
+              <span id="smn-channel-status" class="info-v">Active — texts only if symptoms persist</span>
+            </div>
+            <span id="smn-state-tag" class="mini-tag ok-tag">Active</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- Row 2: Live Bedside Signals (Plain Interpretation First) + Overnight Trend -->
+    <section class="web-row row-middle" aria-label="Live Bedside Signals and Overnight Trend">
+      <div class="signals-column">
+        <div class="col-heading">
+          <h2>Live Bedside Signals</h2>
+          <span id="route-caption" class="caption-pill">Quiet rest · Live</span>
+        </div>
+
+        <div class="signals-bento">
+          <article class="bento-lavender">
+            <div class="bento-top">
+              <div>
+                <span class="bento-title">Pulse Rate</span>
+                <div id="hr-interp" class="bento-interp-lg">Steady</div>
+                <div id="hr-val-row" class="bento-sub-strong tnum">60 bpm</div>
+              </div>
+              <div class="bento-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              </div>
+            </div>
+            <canvas id="ppg-canvas" class="ppg-canvas" aria-label="Live pulse rhythm"></canvas>
+          </article>
+
+          <div class="bento-pair">
+            <article class="bento-sage">
+              <div class="bento-top">
+                <div>
+                  <span class="bento-title">Heart Rate Variability</span>
+                  <div id="hrv-interp" class="bento-interp-md">Calm</div>
+                  <div id="hrv-val-row" class="bento-sub-strong tnum">40 ms</div>
+                </div>
+                <div class="bento-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 12h3l2.5-6 4 12 3-8 2.5 2H22" />
+                  </svg>
+                </div>
+              </div>
+            </article>
+
+            <article class="bento-peach">
+              <div class="bento-top">
+                <div>
+                  <span class="bento-title">Rest &amp; Stillness</span>
+                  <div id="tremor-interp" class="bento-interp-md">Calm &amp; Still</div>
+                  <div id="tremor-sub" class="bento-sub-strong">No shaking or restlessness</div>
+                </div>
+                <div class="bento-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 9v6M9 5v14M15 7v10M19 10v4" />
+                  </svg>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Overnight Check-In Trend + 3 Plain Tiles -->
+      <article class="panel-card chart-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Tonight's Overnight Trend</h2>
+            <p class="panel-sub tnum">Overnight check-in status · 12 AM – 8 AM</p>
+          </div>
+          <span id="chart-status-chip" class="soft-chip ok-chip">Calm Night</span>
+        </div>
+
+        <div class="svg-chart-wrap">
+          <svg id="overnight-svg" class="overnight-svg" viewBox="0 0 620 220" role="img" aria-label="Overnight sleep check-in status from 12am to 8am"></svg>
+          <div id="chart-tooltip" class="chart-tooltip tnum" hidden></div>
+        </div>
+
+        <div class="summary-bar">
+          <div class="summary-metric">
+            <span class="summary-k">Sleep Status</span>
+            <span id="sum-sleep" class="summary-v">Deep &amp; Calm</span>
+          </div>
+          <div class="summary-metric">
+            <span class="summary-k">Movement</span>
+            <span id="sum-movement" class="summary-v">Resting still</span>
+          </div>
+          <div class="summary-metric">
+            <span class="summary-k">This Week</span>
+            <span id="sum-week" class="summary-v tnum">6 calm nights</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Row 3: Clean Plain-English Night Activity Log -->
+    <section class="panel-card timeline-panel" aria-label="Night Activity Log">
+      <div class="panel-head">
+        <div>
+          <h2>Night Activity Log</h2>
+          <p class="panel-sub">Overnight check-ins and automatic movement filtering (22:00–06:00)</p>
+        </div>
+      </div>
+
+      <ul id="event-list" class="web-timeline"></ul>
+    </section>
+
+    <!-- Single Quiet Footer Attribution for Huawei Cloud -->
+    <footer class="cloud-footer">
+      <span class="cloud-footer-pill">Powered by Huawei Cloud (ECS · Redis · RDS · SMN)</span>
+    </footer>
+  </main>
+</body>
+</html>
