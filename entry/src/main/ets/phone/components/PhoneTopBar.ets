@@ -1,79 +1,125 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Minimalist Bedside Status Header.
- * Clinical-grade status indicator: Watch BLE link, battery, and quick scenario test action.
+ * Phone Companion — Clean Editorial Top Bar (No pill strokes, minimal copy).
  */
 
+import { BodyType, DetectionPhase } from '../models/PhoneTypes';
+import { phaseShortLabel } from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneTopBar {
-  @Prop currentTime: string = '00:00:00';
   @Prop isEmergency: boolean = false;
   @Prop isWatchConnected: boolean = true;
   @Prop watchBattery: number = 86;
-  @Prop deviceName: string = 'WATCH 4 Pro';
+  @Prop phase: DetectionPhase = 'P1';
+  @Prop bodyType: BodyType = 'Adrenergic';
   onOpenTest: () => void = () => {};
+  onOpenAlerts: () => void = () => {};
+  onNavigateGuardian: () => void = () => {};
 
   build() {
-    Row() {
-      // Left: Tonight context + status + time
+    Column({ space: 12 }) {
       Row({ space: 10 }) {
-        Circle({ width: 10, height: 10 })
-          .fill(this.isEmergency ? PhoneTheme.STATE_CRIT : (this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.STATE_WARN))
+        Button() {
+          Row({ space: 8 }) {
+            Stack({ alignContent: Alignment.Center }) {
+              Circle({ width: 40, height: 40 })
+                .fill('#DCE7F2')
+              SymbolGlyph($r('sys.symbol.person_crop_circle_fill_1'))
+                .fontSize(26)
+                .fontColor([PhoneTheme.BRAND_PRIMARY])
+            }
+            .width(40)
+            .height(40)
 
-        Column({ space: 0 }) {
-          Text('TONIGHT')
-            .fontSize(PhoneTheme.FONT_MICRO)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(PhoneTheme.TEXT_TERTIARY)
-          Text(this.isEmergency ? 'Urgent — check now' : (this.isWatchConnected ? 'Monitoring' : 'Watch offline'))
-            .fontSize(PhoneTheme.FONT_SECTION)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
-          Text(this.currentTime)
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_MUTED)
+            Row({ space: 5 }) {
+              Circle({ width: 6, height: 6 })
+                .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.STATE_WARN)
+
+              Text(this.isWatchConnected ? `${this.watchBattery}%` : 'Off')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontWeight(FontWeight.Medium)
+                .fontFeature('"tnum" on')
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+            }
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .backgroundColor(PhoneTheme.BG_CARD)
+            .borderRadius(PhoneTheme.PILL_RADIUS)
+            .shadow({ radius: 8, color: 'rgba(17, 19, 24, 0.04)', offsetY: 2 })
+          }
+          .alignItems(VerticalAlign.Center)
         }
-        .alignItems(HorizontalAlign.Start)
-      }
-      .alignItems(VerticalAlign.Center)
-      .layoutWeight(1)
+        .backgroundColor(Color.Transparent)
+        .padding(0)
+        .onClick(() => {
+          this.onNavigateGuardian();
+        })
 
-      // Right: Watch link + labeled Test
-      Row({ space: 8 }) {
-        Row({ space: 6 }) {
-          Circle({ width: 6, height: 6 })
-            .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.TEXT_TERTIARY)
-          Text(this.isWatchConnected ? `Watch ${this.watchBattery}%` : 'Watch off')
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(PhoneTheme.TEXT_SECONDARY)
-        }
-        .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-        .backgroundColor(PhoneTheme.BG_CARD)
-        .borderWidth(1)
-        .borderColor(PhoneTheme.BORDER_SUBTLE)
-        .borderRadius(PhoneTheme.PILL_RADIUS)
-        .alignItems(VerticalAlign.Center)
+        Blank()
 
-        Button('Test')
-          .fontSize(PhoneTheme.FONT_CAPTION)
-          .fontWeight(FontWeight.Bold)
-          .height(32)
-          .padding({ left: 12, right: 12 })
-          .backgroundColor(PhoneTheme.BRAND_PRIMARY)
-          .fontColor(PhoneTheme.TEXT_ON_DARK)
-          .borderRadius(PhoneTheme.PILL_RADIUS)
+        // Twin white pill (Bell + Menu) — zero inner divider stroke
+        Row({ space: 2 }) {
+          Button() {
+            Stack({ alignContent: Alignment.TopEnd }) {
+              SymbolGlyph($r('sys.symbol.bell'))
+                .fontSize(18)
+                .fontColor([PhoneTheme.TEXT_PRIMARY])
+
+              if (this.isEmergency) {
+                Circle({ width: 7, height: 7 })
+                  .fill(PhoneTheme.STATE_CRIT)
+                  .offset({ x: 2, y: -1 })
+              }
+            }
+            .width(24)
+            .height(24)
+            .alignContent(Alignment.Center)
+          }
+          .width(40)
+          .height(38)
+          .backgroundColor(Color.Transparent)
+          .onClick(() => {
+            this.onOpenAlerts();
+          })
+
+          Button() {
+            SymbolGlyph($r('sys.symbol.line_3_horizontal'))
+              .fontSize(18)
+              .fontColor([PhoneTheme.TEXT_PRIMARY])
+          }
+          .width(40)
+          .height(38)
+          .backgroundColor(Color.Transparent)
           .onClick(() => {
             this.onOpenTest();
           })
+        }
+        .height(42)
+        .padding({ left: 6, right: 6 })
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderRadius(21)
+        .shadow({ radius: 12, color: 'rgba(17, 19, 24, 0.06)', offsetY: 3 })
+        .alignItems(VerticalAlign.Center)
       }
+      .width('100%')
       .alignItems(VerticalAlign.Center)
+
+      Column({ space: 2 }) {
+        Text(phaseShortLabel(this.phase))
+          .fontSize(15)
+          .fontWeight(FontWeight.Normal)
+          .fontColor(PhoneTheme.TEXT_MUTED)
+
+        Text(this.isEmergency ? 'Surge Alert' : 'Sleep Monitor')
+          .fontSize(PhoneTheme.FONT_DISPLAY)
+          .fontWeight(FontWeight.Bold)
+          .letterSpacing(-0.6)
+          .fontColor(this.isEmergency ? PhoneTheme.STATE_CRIT_DARK : PhoneTheme.TEXT_PRIMARY)
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .alignItems(VerticalAlign.Center)
-    .padding({ left: 16, right: 16, top: 12, bottom: 8 })
-    .backgroundColor(PhoneTheme.BG_PAGE)
   }
 }

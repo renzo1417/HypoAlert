@@ -3,6 +3,12 @@
  * Type definitions and interfaces for the Phone Companion module.
  */
 
+export type DetectionPhase = 'P1' | 'P2' | 'P3';
+
+export type BodyType = 'Adrenergic' | 'Blunted';
+
+export type ScenarioPreset = 'calm' | 'motion' | 'baseline' | 'warning' | 'surge';
+
 export interface AuditEntry {
   time: string;
   message: string;

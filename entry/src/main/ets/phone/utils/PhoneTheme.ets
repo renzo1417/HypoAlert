@@ -1,66 +1,77 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Unified Mobile Design System Tokens.
- * Mobile-first, clinical-grade, anti-slop color palette and typography scale.
+ * Phone Companion — Pastel Bento Wellness & Clinical Precision Design Tokens.
+ * Soft alabaster canvas, sky/lavender/sage/peach bento cards, obsidian floating dock, and vivid sky-blue action FAB.
  */
 
 export class PhoneTheme {
-  // --- Surfaces & Backgrounds (layered: page < sunken < card) ---
-  static readonly BG_PAGE: string = '#EDF1F6';        // Deeper cool-slate canvas, lifts white hero
-  static readonly BG_CARD: string = '#FFFFFF';        // Hero / elevated only
-  static readonly BG_RAISED: string = '#FFFFFF';      // Elevated surface alias
-  static readonly BG_SUNKEN: string = '#E2E8F0';      // Quiet secondary tiles, visible separation
-  static readonly BG_MUTED: string = '#E2E8F0';       // Input / sunken fill
-  static readonly BG_SUBTLE: string = '#F3F6FA';      // Subtle container
-  static readonly BG_NAV: string = '#FFFFFF';         // Floating navigation surface
+  // --- Canvas & Base Surfaces ---
+  static readonly BG_PAGE: string = '#F7F8FA';         // Airy cool off-white canvas
+  static readonly BG_CARD: string = '#FFFFFF';         // Pure white bento & report surfaces
+  static readonly BG_RAISED: string = '#FFFFFF';       // Elevated card alias
+  static readonly BG_INSET: string = '#F1F3F7';        // Quiet recessed pill & date chips
+  static readonly BG_SUNKEN: string = '#E8ECF2';       // Subtle active neutral chip
+  static readonly BG_SUBTLE: string = '#F8F9FB';       // Soft row backing
+  static readonly BG_NAV: string = '#111318';          // Obsidian floating dock pill
 
-  // --- Borders ---
-  static readonly BORDER_SUBTLE: string = '#DCE4EE';   // Slightly deeper for contrast on #EDF1F6
-  static readonly BORDER_LIGHT: string = '#E6EDF5';    // Inner dividers
-  static readonly BORDER_FOCUS: string = '#0F172A';    // Active border
+  // --- Reference Pastel Bento Palette ---
+  static readonly HERO_SKY_TOP: string = '#DCE7F2';    // Hero sky-steel gradient start
+  static readonly HERO_SKY_BOT: string = '#CEDEEB';    // Hero sky-steel gradient end
+  static readonly BENTO_LAV_TOP: string = '#EAE2F8';   // Lavender card start
+  static readonly BENTO_LAV_BOT: string = '#DFD3F5';   // Lavender card end
+  static readonly BENTO_LAV_LINE: string = '#8B5CF6';  // Lavender curve stroke
+  static readonly BENTO_SAGE_TOP: string = '#E2EFE0';  // Sage green card start
+  static readonly BENTO_SAGE_BOT: string = '#D5E7D2';  // Sage green card end
+  static readonly BENTO_PEACH_TOP: string = '#F8E5DE'; // Peach card start
+  static readonly BENTO_PEACH_BOT: string = '#F2D9D0'; // Peach card end
 
-  // --- Text Hierarchy ---
-  static readonly TEXT_PRIMARY: string = '#0F172A';   // Slate 900 for high-contrast titles & metrics
-  static readonly TEXT_SECONDARY: string = '#334155'; // Slate 700 for subtitles & section headers
-  static readonly TEXT_MUTED: string = '#64748B';     // Slate 500 for descriptions & metadata
-  static readonly TEXT_TERTIARY: string = '#94A3B8';  // Slate 400 for units, timestamps & hints
-  static readonly TEXT_ON_DARK: string = '#FFFFFF';   // White on dark buttons/chips
+  // --- Hairlines & Borders ---
+  static readonly BORDER_SUBTLE: string = '#E6E9EF';   // Crisp subtle hairline
+  static readonly BORDER_LIGHT: string = '#EEF0F4';    // Internal divider hairline
+  static readonly BORDER_FOCUS: string = '#2A82F0';    // Active blue border
 
-  // --- Brand & Primary Interactive ---
-  static readonly BRAND_PRIMARY: string = '#0F172A';  // Slate 900 primary button / active tab
-  static readonly BRAND_ACCENT: string = '#0284C7';   // Sky 600 active link / sync indicator
-  static readonly BRAND_ACCENT_BG: string = '#F0F9FF';// Sky 50 soft badge fill
+  // --- Text Ink Hierarchy ---
+  static readonly TEXT_PRIMARY: string = '#111318';    // Deep obsidian charcoal
+  static readonly TEXT_SECONDARY: string = '#4B5563';  // Slate charcoal
+  static readonly TEXT_MUTED: string = '#7C8494';      // Calm cool gray
+  static readonly TEXT_TERTIARY: string = '#A1A8B5';   // Subtle units & hints
+  static readonly TEXT_ON_DARK: string = '#FFFFFF';    // Pure white on dark dock / red crisis
 
-  // --- Semantic Health States ---
-  // Normal / Stable
-  static readonly STATE_OK: string = '#10B981';       // Emerald 500
-  static readonly STATE_OK_TEXT: string = '#047857';  // Emerald 700
-  static readonly STATE_OK_BG: string = '#ECFDF5';    // Emerald 50
+  // --- Brand & Interactive Accents ---
+  static readonly BRAND_PRIMARY: string = '#111318';   // Obsidian black active pills & buttons
+  static readonly BRAND_ACCENT: string = '#2A82F0';    // Vivid sky-cobalt blue FAB & arc segment
+  static readonly BRAND_ACCENT_BG: string = '#EBF4FF'; // Soft sky selection fill
 
-  // Warning / Pre-Drop Dip
-  static readonly STATE_WARN: string = '#F59E0B';     // Amber 500
-  static readonly STATE_WARN_TEXT: string = '#B45309';// Amber 700
-  static readonly STATE_WARN_BG: string = '#FFFBEB';  // Amber 50
+  // --- Semantic Clinical States ---
+  static readonly STATE_OK: string = '#22C55E';        // Healthy emerald dot
+  static readonly STATE_OK_TEXT: string = '#166534';   // Deep forest green on mint pill
+  static readonly STATE_OK_BG: string = '#D9F5D8';     // Soft mint status pill
 
-  // Critical / Hypo Emergency
-  static readonly STATE_CRIT: string = '#EF4444';     // Red 500
-  static readonly STATE_CRIT_DARK: string = '#DC2626';// Red 600
-  static readonly STATE_CRIT_TEXT: string = '#B91C1C';// Red 700
-  static readonly STATE_CRIT_BG: string = '#FEF2F2';  // Red 50
+  static readonly STATE_WARN: string = '#F5B70A';      // Golden amber arc segment & caution
+  static readonly STATE_WARN_TEXT: string = '#92400E'; // Deep amber-brown ink
+  static readonly STATE_WARN_BG: string = '#FEF3C7';   // Soft amber fill
+  static readonly STATE_WARN_BORDER: string = '#FDE68A';
 
-  // --- Mobile-First Typography Scale (in fp / sp) ---
-  static readonly FONT_HERO: number = 32;             // Main glucose reading, single dominant number
-  static readonly FONT_TITLE: number = 18;            // Screen headers, quieter
-  static readonly FONT_SECTION: number = 14;          // Card titles & section headers
-  static readonly FONT_SUBTITLE: number = 13;         // Card subtitle / secondary text
-  static readonly FONT_BODY: number = 12;             // Regular descriptions & list items
-  static readonly FONT_CAPTION: number = 11;          // Status badges & timestamps
-  static readonly FONT_MICRO: number = 10;            // Metric units & compact chips
+  static readonly STATE_CRIT: string = '#EF4444';      // Coral-red bars & arc critical segment
+  static readonly STATE_CRIT_DARK: string = '#DC2626'; // Urgent crimson hero fill
+  static readonly STATE_CRIT_TEXT: string = '#B91C1C'; // Deep red ink on light
+  static readonly STATE_CRIT_BG: string = '#FEE2E2';   // Soft rose status pill
 
-  // --- Layout & Component Geometry ---
-  static readonly CARD_RADIUS: number = 16;           // Consistent card corner radius
-  static readonly TILE_RADIUS: number = 12;           // Sub-card / metric tile corner radius
-  static readonly PILL_RADIUS: number = 999;          // Rounded badge radius
-  static readonly CARD_PADDING: number = 16;          // Standard interior card padding
-  static readonly TOUCH_MIN: number = 48;             // Minimum accessible touch target (px)
+  // --- Typography Scale (fp / sp) ---
+  static readonly FONT_HERO: number = 38;              // Dominant metric reading
+  static readonly FONT_DISPLAY: number = 28;           // Screen greeting headline
+  static readonly FONT_TITLE: number = 22;             // Page titles
+  static readonly FONT_METRIC: number = 26;            // Bento metric figures
+  static readonly FONT_SECTION: number = 17;           // Section headers (Overview, Night Summary)
+  static readonly FONT_SUBTITLE: number = 14;          // Action button & card headers
+  static readonly FONT_BODY: number = 13;              // Body descriptions
+  static readonly FONT_CAPTION: number = 11;           // Supporting labels & dates
+  static readonly FONT_MICRO: number = 10;             // Badges & units
+
+  // --- Geometry ---
+  static readonly CARD_RADIUS: number = 24;            // Generous rounded bento cards
+  static readonly TILE_RADIUS: number = 16;            // Inner tiles & action pills
+  static readonly PILL_RADIUS: number = 999;           // Full pill capsule
+  static readonly CARD_PADDING: number = 18;           // Standard card interior padding
+  static readonly TOUCH_MIN: number = 44;              // Minimum tap height
 }
