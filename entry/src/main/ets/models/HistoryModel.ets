@@ -1,16 +1,20 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Multi-night history data model and audit trail contracts for Watch and Phone.
+ * Multi-night symptom history, finger-prick verification, and Phase 1-3 gate tracking.
  */
+
+import { DetectionPhase, GateProgress } from './VitalsModel';
 
 export interface ActionTakenEntry {
   time: string;
-  type: 'haptic' | 'alarm' | 'sms' | 'call' | 'snooze' | 'resolve';
+  type: 'haptic' | 'alarm' | 'sms' | 'call' | 'prick' | 'resolve';
   title: string;
   detail: string;
   target?: string;
   status: 'Sent' | 'Delivered' | 'Active' | 'Acknowledged' | 'Completed';
 }
+
+export type FingerPrickVerdict = 'Confirmed Low' | 'Fine Night' | 'Pending Check' | 'None';
 
 export interface NightHistoryRecord {
   id: string;
@@ -18,14 +22,17 @@ export interface NightHistoryRecord {
   dateShort: string;
   dayOfWeek: string;
   status: 'NORMAL' | 'WARNING' | 'CRITICAL';
-  lowestGlucose: number;
-  peakRiskIndex: number;
-  avgPulse: number;
-  minSkinTemp: number;
+  phaseUsed: DetectionPhase;
+  peakRiskPct: number;
+  peakScore: number;
+  avgHr: number;
+  minRmssd: number;
   durationHours: number;
   episodesCount: number;
+  fingerPrickMgDl?: number;
+  fingerPrickVerdict: FingerPrickVerdict;
   actionsSummary: string;
-  hourlyPoints: number[];
+  hourlyRiskPct: number[]; // 12am, 2am, 4am, 6am, 8am symptom risk %
   actionsTaken: ActionTakenEntry[];
 }
 
@@ -39,6 +46,16 @@ export interface EmergencyContact {
 }
 
 export class HistoryRepository {
+  private static gateState: GateProgress = {
+    buzzLinkedPricks: 2,
+    confirmedLows: 0,
+    fineNights: 6,
+    personalLine: 3.7,
+    hasPersonalLine: false,
+    isCnnUnlocked: false,
+    isA2Personalized: false
+  };
+
   private static defaultContacts: EmergencyContact[] = [
     {
       id: 'c1',
@@ -73,232 +90,181 @@ export class HistoryRepository {
       dateShort: 'Tonight',
       dayOfWeek: 'Sun',
       status: 'NORMAL',
-      lowestGlucose: 5.2,
-      peakRiskIndex: 12,
-      avgPulse: 62,
-      minSkinTemp: 35.9,
+      phaseUsed: 1,
+      peakRiskPct: 14,
+      peakScore: 0.9,
+      avgHr: 62,
+      minRmssd: 41,
       durationHours: 6.5,
       episodesCount: 0,
-      actionsSummary: 'Calm Sleep • 0 Episodes',
-      hourlyPoints: [5.6, 5.4, 5.2, 5.3, 5.5],
+      fingerPrickVerdict: 'None',
+      actionsSummary: 'Calm sleep • 0 alerts',
+      hourlyRiskPct: [10, 12, 14, 11, 9],
       actionsTaken: [
         {
           time: '10:00 PM',
           type: 'resolve',
-          title: 'Night Guardian Activated',
-          detail: 'Bedtime monitoring engaged. Baseline calibrated (HR: 61 bpm, Temp: 36.0°C).',
+          title: '75-Min Silent Baseline Started',
+          detail: 'Learning normal resting heart rate, HRV, and wrist stillness.',
           status: 'Acknowledged'
         },
         {
-          time: '01:15 AM',
+          time: '11:15 PM',
           type: 'resolve',
-          title: 'Autonomous System Heartbeat',
-          detail: 'Telemetry stable, no sympathetic surges detected.',
+          title: 'Baseline Ready — Checking Every 5 Min',
+          detail: 'Quiet sleep confirmed. Single spikes ignored; 3-in-a-row safety rule active.',
           status: 'Acknowledged'
         }
       ]
     },
     {
       id: 'night_1',
-      dateLabel: 'Sep 27 (Yesterday)',
-      dateShort: 'Sep 27',
+      dateLabel: 'Night 6 (Yesterday)',
+      dateShort: 'Night 6',
       dayOfWeek: 'Sat',
       status: 'CRITICAL',
-      lowestGlucose: 3.1,
-      peakRiskIndex: 88,
-      avgPulse: 74,
-      minSkinTemp: 34.8,
+      phaseUsed: 1,
+      peakRiskPct: 86,
+      peakScore: 4.4,
+      avgHr: 74,
+      minRmssd: 16,
       durationHours: 7.8,
       episodesCount: 1,
-      actionsSummary: 'Wrist Haptics • 2 SMS Dispatched • Call Placed',
-      hourlyPoints: [5.5, 4.4, 3.1, 4.6, 5.2],
+      fingerPrickMgDl: 52,
+      fingerPrickVerdict: 'Confirmed Low',
+      actionsSummary: 'Buzz + 1 text sent • Confirmed 52 mg/dL',
+      hourlyRiskPct: [12, 48, 86, 28, 14],
       actionsTaken: [
         {
           time: '02:45 AM',
           type: 'haptic',
-          title: 'Wrist Haptic Wake-Up Pulse',
-          detail: 'Continuous 600ms high-intensity emergency vibration activated on Huawei Watch.',
-          status: 'Active'
-        },
-        {
-          time: '02:45 AM',
-          type: 'alarm',
-          title: 'Bedside Auditory Siren',
-          detail: '85dB acoustic buzzer sounded on phone to awaken sleeper.',
+          title: 'Possible Low Buzz (3 Checks in a Row)',
+          detail: 'Sustained fast pulse and 8-12 Hz tremor triggered gentle wrist buzz.',
           status: 'Active'
         },
         {
           time: '02:45 AM',
           type: 'sms',
-          title: 'Emergency SMS Dispatched (SMN)',
-          detail: 'Urgent Alert: Nocturnal hypoglycemia (3.1 mmol/L) detected!',
+          title: 'Check-In Text Sent (1/2 Tonight)',
+          detail: 'Possible nocturnal low symptoms detected — please check in.',
           target: 'Maria Santos (+63 917 123 4567)',
           status: 'Delivered'
         },
         {
-          time: '02:46 AM',
-          type: 'sms',
-          title: 'Secondary Emergency SMS (SMN)',
-          detail: 'Medical Alert: Nocturnal hypoglycemia crisis notification.',
-          target: 'Dr. Ramirez (+63 918 987 6543)',
-          status: 'Delivered'
-        },
-        {
-          time: '02:47 AM',
-          type: 'call',
-          title: 'Direct Emergency Call Initiated',
-          detail: 'Phone auto-dialed caregiver for urgent bedside assistance.',
-          target: 'Maria Santos (+63 917 123 4567)',
-          status: 'Completed'
-        },
-        {
-          time: '02:49 AM',
+          time: '02:48 AM',
           type: 'resolve',
-          title: 'Bedside Presence Confirmed',
-          detail: 'Caregiver tapped "I\'m with them". Alarms snoozed, glucose rescue administered.',
+          title: 'Awake & Resting (30-Min Cooldown)',
+          detail: 'User tapped I\'m Awake. Alarms paused for 30 minutes.',
           status: 'Acknowledged'
+        },
+        {
+          time: '07:10 AM',
+          type: 'prick',
+          title: 'Finger-Prick Logged: 52 mg/dL (Confirmed Low)',
+          detail: 'Saved to calibration store. Helps unlock Phase 3 1D-CNN.',
+          status: 'Completed'
         }
       ]
     },
     {
       id: 'night_2',
-      dateLabel: 'Sep 26',
-      dateShort: 'Sep 26',
+      dateLabel: 'Night 5',
+      dateShort: 'Night 5',
       dayOfWeek: 'Fri',
       status: 'WARNING',
-      lowestGlucose: 4.1,
-      peakRiskIndex: 42,
-      avgPulse: 68,
-      minSkinTemp: 35.5,
+      phaseUsed: 1,
+      peakRiskPct: 58,
+      peakScore: 3.1,
+      avgHr: 67,
+      minRmssd: 28,
       durationHours: 8.0,
-      episodesCount: 1,
-      actionsSummary: 'Early Warning • Watch Haptic Check',
-      hourlyPoints: [5.7, 5.1, 4.1, 4.8, 5.4],
+      episodesCount: 0,
+      fingerPrickMgDl: 104,
+      fingerPrickVerdict: 'Fine Night',
+      actionsSummary: 'Single spike ignored • Fine 104 mg/dL',
+      hourlyRiskPct: [14, 58, 22, 16, 12],
       actionsTaken: [
         {
           time: '03:20 AM',
-          type: 'haptic',
-          title: 'Mild Restlessness Haptic Check',
-          detail: 'Single pulse delivered to check sleeper response as glucose dipped to 4.1 mmol/L.',
-          status: 'Delivered'
+          type: 'resolve',
+          title: 'Single Elevated Check Ignored',
+          detail: '1 of 3 checks rose during dream sleep, then returned to baseline. Zero false wakeup.',
+          status: 'Acknowledged'
         },
         {
-          time: '03:40 AM',
-          type: 'resolve',
-          title: 'Vitals Re-stabilized',
-          detail: 'Sympathetic tone calmed without requiring full siren dispatch.',
-          status: 'Acknowledged'
+          time: '07:25 AM',
+          type: 'prick',
+          title: 'Morning Finger-Prick: 104 mg/dL (Fine)',
+          detail: 'Marked as normal night (70+ mg/dL).',
+          status: 'Completed'
         }
       ]
     },
     {
       id: 'night_3',
-      dateLabel: 'Sep 25',
-      dateShort: 'Sep 25',
+      dateLabel: 'Night 4',
+      dateShort: 'Night 4',
       dayOfWeek: 'Thu',
       status: 'NORMAL',
-      lowestGlucose: 5.4,
-      peakRiskIndex: 10,
-      avgPulse: 60,
-      minSkinTemp: 36.1,
-      durationHours: 7.2,
+      phaseUsed: 1,
+      peakRiskPct: 16,
+      peakScore: 1.1,
+      avgHr: 60,
+      minRmssd: 43,
+      durationHours: 7.4,
       episodesCount: 0,
-      actionsSummary: 'Calm Sleep • 0 Episodes',
-      hourlyPoints: [5.8, 5.6, 5.4, 5.5, 5.7],
+      fingerPrickMgDl: 112,
+      fingerPrickVerdict: 'Fine Night',
+      actionsSummary: 'Calm sleep • Fine 112 mg/dL',
+      hourlyRiskPct: [10, 14, 16, 13, 11],
       actionsTaken: [
         {
-          time: '10:15 PM',
-          type: 'resolve',
-          title: 'Night Guardian Activated',
-          detail: 'Normal sleep settling detected.',
-          status: 'Acknowledged'
+          time: '07:15 AM',
+          type: 'prick',
+          title: 'Morning Finger-Prick: 112 mg/dL (Fine)',
+          detail: 'Normal night recorded.',
+          status: 'Completed'
         }
       ]
     },
     {
       id: 'night_4',
-      dateLabel: 'Sep 24',
-      dateShort: 'Sep 24',
+      dateLabel: 'Night 3',
+      dateShort: 'Night 3',
       dayOfWeek: 'Wed',
       status: 'CRITICAL',
-      lowestGlucose: 3.3,
-      peakRiskIndex: 82,
-      avgPulse: 72,
-      minSkinTemp: 34.9,
+      phaseUsed: 1,
+      peakRiskPct: 79,
+      peakScore: 3.9,
+      avgHr: 71,
+      minRmssd: 22,
       durationHours: 7.5,
       episodesCount: 1,
-      actionsSummary: 'Wrist Haptics • SMS Dispatched',
-      hourlyPoints: [5.4, 4.8, 3.3, 4.7, 5.3],
+      fingerPrickMgDl: 84,
+      fingerPrickVerdict: 'Fine Night',
+      actionsSummary: 'Buzz + 1 text sent • Fine 84 mg/dL',
+      hourlyRiskPct: [15, 24, 79, 20, 12],
       actionsTaken: [
         {
           time: '04:10 AM',
           type: 'haptic',
-          title: 'Critical Alarm Triggered',
-          detail: 'Wrist vibration and bedside siren activated.',
+          title: 'Possible Low Buzz (3 Checks in a Row)',
+          detail: 'Gentle wrist buzz + check-in alert sent.',
           status: 'Active'
-        },
-        {
-          time: '04:10 AM',
-          type: 'sms',
-          title: 'SMN Alert Dispatched',
-          detail: 'Emergency text delivered to primary caregiver.',
-          target: 'Maria Santos (+63 917 123 4567)',
-          status: 'Delivered'
         },
         {
           time: '04:14 AM',
           type: 'resolve',
-          title: 'Alert Silenced by User',
-          detail: 'User confirmed "I\'m awake" on Huawei Watch.',
+          title: 'User Confirmed Awake',
+          detail: 'Alert silenced on Huawei Watch.',
           status: 'Acknowledged'
-        }
-      ]
-    },
-    {
-      id: 'night_5',
-      dateLabel: 'Sep 23',
-      dateShort: 'Sep 23',
-      dayOfWeek: 'Tue',
-      status: 'NORMAL',
-      lowestGlucose: 5.1,
-      peakRiskIndex: 14,
-      avgPulse: 61,
-      minSkinTemp: 36.0,
-      durationHours: 8.2,
-      episodesCount: 0,
-      actionsSummary: 'Calm Sleep • 0 Episodes',
-      hourlyPoints: [5.5, 5.3, 5.1, 5.2, 5.6],
-      actionsTaken: [
+        },
         {
-          time: '10:00 PM',
-          type: 'resolve',
-          title: 'Night Guardian Activated',
-          detail: 'Undisturbed sleep all night.',
-          status: 'Acknowledged'
-        }
-      ]
-    },
-    {
-      id: 'night_6',
-      dateLabel: 'Sep 22',
-      dateShort: 'Sep 22',
-      dayOfWeek: 'Mon',
-      status: 'NORMAL',
-      lowestGlucose: 5.3,
-      peakRiskIndex: 11,
-      avgPulse: 63,
-      minSkinTemp: 36.0,
-      durationHours: 7.0,
-      episodesCount: 0,
-      actionsSummary: 'Calm Sleep • 0 Episodes',
-      hourlyPoints: [5.6, 5.4, 5.3, 5.4, 5.5],
-      actionsTaken: [
-        {
-          time: '10:30 PM',
-          type: 'resolve',
-          title: 'Night Guardian Activated',
-          detail: 'Baseline stable.',
-          status: 'Acknowledged'
+          time: '04:20 AM',
+          type: 'prick',
+          title: 'Buzz Finger-Prick: 84 mg/dL (Fine)',
+          detail: 'Teaches personal cutoff to stay quieter on benign shifts.',
+          status: 'Completed'
         }
       ]
     }
@@ -316,39 +282,95 @@ export class HistoryRepository {
     return HistoryRepository.defaultHistory.slice(0, maxDays);
   }
 
-  public static updateTonightCrisis(glucose: number, risk: number, caregiverName: string, caregiverPhone: string): void {
-    const tonight = HistoryRepository.defaultHistory[0];
+  public static getGateProgress(): GateProgress {
+    return {
+      buzzLinkedPricks: HistoryRepository.gateState.buzzLinkedPricks,
+      confirmedLows: HistoryRepository.gateState.confirmedLows,
+      fineNights: HistoryRepository.gateState.fineNights,
+      personalLine: HistoryRepository.gateState.personalLine,
+      hasPersonalLine: HistoryRepository.gateState.hasPersonalLine,
+      isCnnUnlocked: HistoryRepository.gateState.isCnnUnlocked,
+      isA2Personalized: HistoryRepository.gateState.isA2Personalized
+    };
+  }
+
+  public static updateTonightCrisis(
+    riskPct: number,
+    score: number,
+    reasonSummary: string,
+    alertsTonight: number,
+    caregiverName: string,
+    caregiverPhone: string,
+    phase: DetectionPhase
+  ): void {
+    const tonight: NightHistoryRecord = HistoryRepository.defaultHistory[0];
     tonight.status = 'CRITICAL';
-    tonight.lowestGlucose = glucose;
-    tonight.peakRiskIndex = risk;
-    tonight.episodesCount = 1;
-    tonight.actionsSummary = `Haptics Active • SMS sent to ${caregiverName}`;
-    tonight.hourlyPoints = [5.6, 4.8, glucose, 4.2, 5.0];
+    tonight.phaseUsed = phase;
+    tonight.peakRiskPct = Math.max(tonight.peakRiskPct, riskPct);
+    tonight.peakScore = Math.max(tonight.peakScore, score);
+    tonight.episodesCount = alertsTonight;
+    tonight.fingerPrickVerdict = 'Pending Check';
+    tonight.actionsSummary = `Buzz + ${alertsTonight}/2 texts • Log finger-prick`;
+    tonight.hourlyRiskPct = [12, 34, riskPct, 28, 16];
     tonight.actionsTaken.unshift({
       time: 'Just now',
       type: 'sms',
-      title: 'Emergency SMS Dispatched (SMN)',
-      detail: `Hypoglycemia alert (${glucose.toFixed(1)} mmol/L) dispatched.`,
+      title: `Check-In Text Sent (${alertsTonight}/2 Tonight)`,
+      detail: `Possible low symptoms: ${reasonSummary}`,
       target: `${caregiverName} (${caregiverPhone})`,
       status: 'Delivered'
     });
     tonight.actionsTaken.unshift({
       time: 'Just now',
       type: 'haptic',
-      title: 'Wrist Haptic Pulses Activated',
-      detail: 'Continuous emergency vibration pulses on watch.',
+      title: phase < 3 ? 'Possible Low Wrist Buzz' : '1D-CNN Symptom Alert Buzz',
+      detail: `${reasonSummary}. Log a finger-prick check when awake.`,
       status: 'Active'
     });
   }
 
   public static updateTonightResolved(): void {
-    const tonight = HistoryRepository.defaultHistory[0];
+    const tonight: NightHistoryRecord = HistoryRepository.defaultHistory[0];
     tonight.actionsTaken.unshift({
       time: 'Just now',
       type: 'resolve',
-      title: 'Assistance Confirmed',
-      detail: 'Alarm silenced. Caregiver confirmed bedside presence.',
+      title: 'Awake Confirmed • 30-Min Cooldown',
+      detail: 'Alarm silenced. Log a finger-prick check to calibrate your watch.',
       status: 'Acknowledged'
     });
+  }
+
+  public static recordFingerPrick(mgDl: number, linkedToBuzz: boolean): GateProgress {
+    const tonight: NightHistoryRecord = HistoryRepository.defaultHistory[0];
+    const isLow: boolean = mgDl < 70;
+    tonight.fingerPrickMgDl = mgDl;
+    tonight.fingerPrickVerdict = isLow ? 'Confirmed Low' : 'Fine Night';
+    tonight.actionsSummary = `${tonight.episodesCount} alert(s) • Prick ${mgDl} mg/dL (${isLow ? 'Low' : 'Fine'})`;
+    tonight.actionsTaken.unshift({
+      time: 'Just now',
+      type: 'prick',
+      title: `Finger-Prick: ${mgDl} mg/dL (${isLow ? 'Confirmed Low <70' : 'Fine 70+'})`,
+      detail: linkedToBuzz
+        ? 'Buzz-linked check saved — helps personalize your cutoff line.'
+        : 'Morning check saved to calibration history.',
+      status: 'Completed'
+    });
+
+    if (linkedToBuzz) {
+      HistoryRepository.gateState.buzzLinkedPricks += 1;
+    }
+    if (isLow) {
+      HistoryRepository.gateState.confirmedLows += 1;
+    } else {
+      HistoryRepository.gateState.fineNights += 1;
+    }
+    if (HistoryRepository.gateState.buzzLinkedPricks >= 3 && !HistoryRepository.gateState.hasPersonalLine) {
+      HistoryRepository.gateState.hasPersonalLine = true;
+      HistoryRepository.gateState.personalLine = 5.44;
+    }
+    if (HistoryRepository.gateState.confirmedLows >= 1 && HistoryRepository.gateState.fineNights >= 10) {
+      HistoryRepository.gateState.isCnnUnlocked = true;
+    }
+    return HistoryRepository.getGateProgress();
   }
 }

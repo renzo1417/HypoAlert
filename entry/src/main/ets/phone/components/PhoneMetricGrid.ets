@@ -1,77 +1,38 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Core Sympathetic Surge Biomarkers:
- * 1. 8–12 Hz Physiological Micro-Tremor (IMU Accelerometry with SMA Motion Gating)
- * 2. Peripheral Vascular Tone & Reflection Index (Optical PPG Pulse Morphology)
- * 3. Nocturnal Skin Temperature & Cold Diaphoresis (Thermal Drift ΔT)
- * 4. Dynamic Nightly Baseline Calibration Status
+ * Phone Companion — Live Physiological Symptom Biomarkers (Zero Skin Temp, Zero Fake Glucose):
+ * 1. Heart Rate & Baseline Shift (PPG)
+ * 2. Heart Calmness / HRV (RMSSD & SDNN ms)
+ * 3. 8-12 Hz Wrist Tremor & Motion Gate
  */
 
+import { VitalsData, VitalsEngine } from '../../models/VitalsModel';
 import {
-  tempColor,
-  riskLevel
+  heartStatusLabel,
+  hrvColor,
+  hrvStatusLabel,
+  tremorColor,
+  tremorLabel
 } from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneMetricGrid {
-  @Prop heartRate: number = 62;
-  @Prop tremorPSD: number = 0.12;
-  @Prop skinTemp: number = 36.0;
-  @Prop riskIndex: number = 12;
+  @Prop vitals: VitalsData = VitalsEngine.createInitialVitals();
   ppgContext: CanvasRenderingContext2D | null = null;
   onCanvasReady: () => void = () => {};
 
-  private isCritical(): boolean {
-    return riskLevel(this.riskIndex) === 'Critical';
-  }
-
-  private isWarning(): boolean {
-    return riskLevel(this.riskIndex) === 'Warning';
-  }
-
-  private getPulseLabel(): string {
-    if (this.isCritical()) {
-      return 'Fast';
-    }
-    if (this.isWarning()) {
-      return 'Raised';
-    }
-    return 'Steady';
-  }
-
-  private getTremorLabel(): string {
-    if (this.tremorPSD > 1.0) {
-      return 'Surge';
-    }
-    if (this.tremorPSD > 0.4) {
-      return 'Active';
-    }
-    return 'Calm';
-  }
-
-  private getSkinLabel(): string {
-    if (this.skinTemp < 35.2) {
-      return 'Cool';
-    }
-    if (this.skinTemp < 35.8) {
-      return 'Slightly cool';
-    }
-    return 'Normal';
-  }
-
   build() {
     Column({ space: 10 }) {
-      // Row 1: Three understandable stat modules
       Row({ space: 10 }) {
-        // Heart rate
+        // Heart rate + PPG strip
         Column({ space: 4 }) {
           Text('Heart rate')
             .fontSize(PhoneTheme.FONT_CAPTION)
             .fontColor(PhoneTheme.TEXT_MUTED)
 
           Row({ space: 3 }) {
-            Text(`${this.heartRate}`)
+            Text(`${this.vitals.pulse}`)
               .fontSize(20)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
@@ -83,7 +44,6 @@ export struct PhoneMetricGrid {
           .width('100%')
           .alignItems(VerticalAlign.Bottom)
 
-          // Visible PPG strip
           if (this.ppgContext) {
             Canvas(this.ppgContext)
               .width('100%')
@@ -95,9 +55,11 @@ export struct PhoneMetricGrid {
               })
           }
 
-          Text(this.getPulseLabel())
+          Text(heartStatusLabel(this.vitals))
             .fontSize(PhoneTheme.FONT_CAPTION)
             .fontColor(PhoneTheme.TEXT_SECONDARY)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .layoutWeight(1)
         .padding(12)
@@ -107,21 +69,26 @@ export struct PhoneMetricGrid {
         .borderRadius(PhoneTheme.TILE_RADIUS)
         .alignItems(HorizontalAlign.Start)
 
-        // Movement + Skin stacked to fill height without emptiness
+        // HRV + Tremor/Motion stacked
         Column({ space: 10 }) {
-          Column({ space: 2 }) {
-            Text('Movement')
-              .fontSize(PhoneTheme.FONT_CAPTION)
-              .fontColor(PhoneTheme.TEXT_MUTED)
-            Row({ space: 4 }) {
-              Circle({ width: 6, height: 6 })
-                .fill(this.tremorPSD > 1.0 ? PhoneTheme.STATE_CRIT : (this.tremorPSD > 0.4 ? PhoneTheme.STATE_WARN : PhoneTheme.STATE_OK))
-                .margin({ top: 4 })
-              Text(this.getTremorLabel())
-                .fontSize(PhoneTheme.FONT_SECTION)
+          // HRV (Heart calmness: RMSSD / SDNN)
+          Row({ space: 8 }) {
+            Circle({ width: 6, height: 6 })
+              .fill(hrvColor(this.vitals.rmssd))
+            Column({ space: 1 }) {
+              Text('Heart calmness (HRV)')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_MUTED)
+                .maxLines(1)
+              Text(`${this.vitals.rmssd} ms • ${hrvStatusLabel(this.vitals.rmssd)}`)
+                .fontSize(PhoneTheme.FONT_BODY)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(PhoneTheme.TEXT_PRIMARY)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
           }
           .width('100%')
           .padding(12)
@@ -129,16 +96,18 @@ export struct PhoneMetricGrid {
           .borderWidth(1)
           .borderColor(PhoneTheme.BORDER_SUBTLE)
           .borderRadius(PhoneTheme.TILE_RADIUS)
-          .alignItems(HorizontalAlign.Start)
+          .alignItems(VerticalAlign.Center)
 
+          // 8-12 Hz Tremor & Motion Gate
           Row({ space: 8 }) {
             Circle({ width: 6, height: 6 })
-              .fill(tempColor(this.skinTemp))
-            Column({ space: 0 }) {
-              Text('Skin temp')
+              .fill(tremorColor(this.vitals.tremorIndex, this.vitals.isSedentary))
+            Column({ space: 1 }) {
+              Text('Wrist tremor & motion')
                 .fontSize(PhoneTheme.FONT_CAPTION)
                 .fontColor(PhoneTheme.TEXT_MUTED)
-              Text(`${this.skinTemp.toFixed(1)}° • ${this.getSkinLabel()}`)
+                .maxLines(1)
+              Text(`${tremorLabel(this.vitals.tremorIndex, this.vitals.isSedentary)} • ${this.vitals.isSedentary ? 'Still' : 'Paused'}`)
                 .fontSize(PhoneTheme.FONT_BODY)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(PhoneTheme.TEXT_PRIMARY)

@@ -1,27 +1,31 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Discrete Clinical Scenario & Testing Modal Sheet.
- * Allows quick simulation of clinical states for demonstrations without cluttering the primary UI.
+ * Phone Companion — Interactive Scenario & Phase 1-3 Testing Sheet.
  */
 
+import { BodyPhenotype, DetectionPhase, VitalsEngine } from '../../models/VitalsModel';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct DemoSheet {
   @Prop isWatchConnected: boolean = true;
   @Prop watchBattery: number = 86;
-  @Prop deviceName: string = 'HUAWEI WATCH 4 Pro';
-  onSimulateStable: () => void = () => {};
-  onSimulatePreDrop: () => void = () => {};
-  onSimulateCrisis: () => void = () => {};
+  @Prop phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
+  @Prop activePhase: DetectionPhase = 1;
+  onSimulateBaseline: () => void = () => {};
+  onSimulateSteady: () => void = () => {};
+  onSimulateStepCheck: () => void = () => {};
+  onSimulateSurge: () => void = () => {};
+  onSimulateMoving: () => void = () => {};
+  onTogglePhenotype: () => void = () => {};
+  onCyclePhase: () => void = () => {};
   onToggleWatchConnection: () => void = () => {};
   onClose: () => void = () => {};
 
   build() {
-    Column({ space: 12 }) {
-      // Header
+    Column({ space: 10 }) {
       Row() {
-        Text('Test scenarios')
+        Text('Test sleep scenarios')
           .fontSize(PhoneTheme.FONT_SECTION)
           .fontWeight(FontWeight.Bold)
           .fontColor(PhoneTheme.TEXT_PRIMARY)
@@ -44,119 +48,174 @@ export struct DemoSheet {
 
       Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
 
-      // Watch link (single line)
+      // Watch link + Body Type + Phase quick toggles
       Row({ space: 8 }) {
-        Circle({ width: 6, height: 6 })
-          .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.STATE_WARN)
-
-        Text(this.isWatchConnected ? `${this.watchBattery}% connected` : 'Offline')
-          .fontSize(PhoneTheme.FONT_BODY)
-          .fontColor(PhoneTheme.TEXT_SECONDARY)
-          .layoutWeight(1)
-
-        Button(this.isWatchConnected ? 'Disconnect' : 'Connect')
+        Button(this.phenotype === BodyPhenotype.ADRENERGIC ? 'Adrenergic (3x)' : 'Blunted (2x)')
           .fontSize(PhoneTheme.FONT_CAPTION)
           .fontWeight(FontWeight.Bold)
-          .height(32)
-          .padding({ left: 12, right: 12 })
-          .backgroundColor(this.isWatchConnected ? PhoneTheme.STATE_CRIT_BG : PhoneTheme.BRAND_PRIMARY)
-          .fontColor(this.isWatchConnected ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_ON_DARK)
+          .height(34)
+          .layoutWeight(1)
+          .backgroundColor(PhoneTheme.BG_SUBTLE)
+          .fontColor(PhoneTheme.BRAND_ACCENT)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
+          .onClick(() => {
+            this.onTogglePhenotype();
+          })
+
+        Button(VitalsEngine.getPhaseShort(this.activePhase))
+          .fontSize(PhoneTheme.FONT_CAPTION)
+          .fontWeight(FontWeight.Bold)
+          .height(34)
+          .layoutWeight(1)
+          .backgroundColor(PhoneTheme.BG_SUBTLE)
+          .fontColor(PhoneTheme.TEXT_PRIMARY)
+          .borderRadius(PhoneTheme.TILE_RADIUS)
+          .onClick(() => {
+            this.onCyclePhase();
+          })
+
+        Button(this.isWatchConnected ? `Watch ${this.watchBattery}%` : 'Offline')
+          .fontSize(PhoneTheme.FONT_CAPTION)
+          .fontWeight(FontWeight.Bold)
+          .height(34)
+          .padding({ left: 10, right: 10 })
+          .backgroundColor(this.isWatchConnected ? PhoneTheme.STATE_OK_BG : PhoneTheme.STATE_WARN_BG)
+          .fontColor(this.isWatchConnected ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.STATE_WARN_TEXT)
           .borderRadius(PhoneTheme.TILE_RADIUS)
           .onClick(() => {
             this.onToggleWatchConnection();
           })
       }
       .width('100%')
-      .padding(10)
-      .backgroundColor(PhoneTheme.BG_SUBTLE)
-      .borderRadius(PhoneTheme.TILE_RADIUS)
-      .alignItems(VerticalAlign.Center)
 
       Column({ space: 8 }) {
-        // Stable
         Button() {
           Row({ space: 10 }) {
-            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_OK)
-            Text('Stable 5.5')
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.BRAND_ACCENT)
+            Text('75-Min Silent Baseline')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
               .layoutWeight(1)
+            Text('Learning')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.BRAND_ACCENT)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(11)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.TILE_RADIUS)
+        .onClick(() => {
+          this.onSimulateBaseline();
+          this.onClose();
+        })
 
-            Text('Apply')
+        Button() {
+          Row({ space: 10 }) {
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_OK)
+            Text('Calm Sleep (Normal)')
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
+            Text('Steady')
               .fontSize(PhoneTheme.FONT_MICRO)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.STATE_OK_TEXT)
           }
           .width('100%')
-          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .padding(12)
+        .padding(11)
         .backgroundColor(PhoneTheme.BG_CARD)
         .borderWidth(1)
         .borderColor(PhoneTheme.BORDER_SUBTLE)
         .borderRadius(PhoneTheme.TILE_RADIUS)
         .onClick(() => {
-          this.onSimulateStable();
+          this.onSimulateSteady();
           this.onClose();
         })
 
-        // Drop
         Button() {
           Row({ space: 10 }) {
             Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_WARN)
-            Text('Drop 4.2')
+            Text('Add 1 Elevated Check (Streak +1)')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
               .layoutWeight(1)
-
-            Text('Apply')
+            Text('Step')
               .fontSize(PhoneTheme.FONT_MICRO)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.STATE_WARN_TEXT)
           }
           .width('100%')
-          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .padding(12)
+        .padding(11)
         .backgroundColor(PhoneTheme.BG_CARD)
         .borderWidth(1)
         .borderColor(PhoneTheme.BORDER_SUBTLE)
         .borderRadius(PhoneTheme.TILE_RADIUS)
         .onClick(() => {
-          this.onSimulatePreDrop();
+          this.onSimulateStepCheck();
           this.onClose();
         })
 
-        // Emergency
         Button() {
           Row({ space: 10 }) {
-            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_CRIT)
-            Text('Emergency 3.1')
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.TEXT_TERTIARY)
+            Text('Tossing / Awake (Motion Gate)')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
               .layoutWeight(1)
+            Text('Pause')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_MUTED)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(11)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.TILE_RADIUS)
+        .onClick(() => {
+          this.onSimulateMoving();
+          this.onClose();
+        })
 
+        Button() {
+          Row({ space: 10 }) {
+            Circle({ width: 8, height: 8 }).fill(PhoneTheme.STATE_CRIT)
+            Text('Sustained Symptom Surge')
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
             Text('Trigger')
               .fontSize(PhoneTheme.FONT_MICRO)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.STATE_CRIT)
           }
           .width('100%')
-          .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-        .padding(12)
+        .padding(11)
         .backgroundColor(PhoneTheme.BG_CARD)
         .borderWidth(1)
         .borderColor(PhoneTheme.STATE_CRIT)
         .borderRadius(PhoneTheme.TILE_RADIUS)
         .onClick(() => {
-          this.onSimulateCrisis();
+          this.onSimulateSurge();
           this.onClose();
         })
       }

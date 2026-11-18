@@ -1,9 +1,16 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Wearable — Main watch controller managing Monitor, Settings, TimePicker, and Alert views.
+ * Wearable — Main watch controller managing Monitor, History, Settings, TimePicker, and Symptom Alert views.
  */
 
-import { AlertState, VitalsData, VitalsEngine } from '../models/VitalsModel';
+import {
+  AlertState,
+  BodyPhenotype,
+  DetectionPhase,
+  VitalsData,
+  VitalsEngine
+} from '../models/VitalsModel';
+import { HistoryRepository } from '../models/HistoryModel';
 import { AlertService } from '../services/AlertService';
 import { DeviceConnectionManager, ConnectionState, ConnectionListener } from '../services/DeviceConnectionManager';
 import { formatHM } from '../common/utils/TimeUtils';
@@ -20,20 +27,17 @@ export struct WatchPage {
   @State isMonitoringActive: boolean = false;
   @State isPhoneConnected: boolean = true;
   @State currentPage: number = 0;
-  @State vitals: VitalsData = {
-    pulse: 62,
-    skinTemp: 36.0,
-    tremorIndex: 0.2,
-    glucose: 5.4,
-    timestamp: '12:23 PM'
-  };
+  @State phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
+  @State activePhase: DetectionPhase = 1;
+  @State personalThreshold: number = VitalsEngine.PHASE1_THRESHOLD;
+  @State vitals: VitalsData = VitalsEngine.createInitialVitals(BodyPhenotype.ADRENERGIC, 1, 3.7);
   @State autoScheduleEnabled: boolean = true;
   @State scheduleStartTime: string = '22:00';
   @State scheduleEndTime: string = '06:00';
   @State ringScale: number = 1.0;
   @State ringOpacity: number = 0.9;
   @State simStatus: string = 'Standby - tap START';
-  @State hapticStatus: string = 'Haptic: idle';
+  @State hapticStatus: string = 'Checks 0/3 • Max 2/night';
   @State testToolsOpen: boolean = false;
   @State editingTime: boolean = false;
   @State editingStart: boolean = true;
@@ -49,7 +53,7 @@ export struct WatchPage {
   private swiperCtl: SwiperController = new SwiperController();
 
   aboutToAppear(): void {
-    this.vitals = VitalsEngine.generateNormalVitals();
+    this.syncVitalsIdle();
     this.isPhoneConnected = this.connManager.isConnected();
     this.connListener = (state: ConnectionState) => {
       this.isPhoneConnected = state.isConnected;
@@ -58,21 +62,58 @@ export struct WatchPage {
 
     this.alertService.setStatusListener((active: boolean, msg: string) => {
       this.simStatus = msg;
-      this.hapticStatus = active ? 'Haptic: alerting' : 'Haptic: idle';
+      this.hapticStatus = active ? 'Buzzing — tap Awake' : this.buildGuardText();
     });
+
     this.vitalsTimerId = setInterval(() => {
       if (!this.isMonitoringActive) {
         return;
       }
       if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
-        this.vitals = VitalsEngine.generateCriticalVitals(this.vitals);
         return;
       }
-      this.vitals = VitalsEngine.generateNormalVitals(this.vitals);
-      if (VitalsEngine.isCritical(this.vitals.glucose)) {
-        this.triggerCrisisAlert();
+      if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+        const nextBase: number = Math.min(VitalsEngine.BASELINE_TOTAL_MINUTES, this.vitals.baselineMinutes + 5);
+        if (nextBase < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+          this.vitals = VitalsEngine.generateBaselineVitals(
+            this.vitals,
+            this.phenotype,
+            this.activePhase,
+            this.getActiveThreshold(),
+            nextBase
+          );
+        } else {
+          this.vitals = VitalsEngine.generateSteadyVitals(
+            this.vitals,
+            this.phenotype,
+            this.activePhase,
+            this.getActiveThreshold(),
+            75,
+            this.vitals.alertsTonight,
+            this.vitals.cooldownMinutes
+          );
+        }
+        this.refreshStatusText();
+        return;
+      }
+      if (!this.vitals.isSedentary) {
+        return;
+      }
+      if (this.vitals.streakCount === 0) {
+        const nextCd: number = this.vitals.cooldownMinutes > 0 ? Math.max(0, this.vitals.cooldownMinutes - 1) : 0;
+        this.vitals = VitalsEngine.generateSteadyVitals(
+          this.vitals,
+          this.phenotype,
+          this.activePhase,
+          this.getActiveThreshold(),
+          75,
+          this.vitals.alertsTonight,
+          nextCd
+        );
+        this.refreshStatusText();
       }
     }, 2500);
+
     this.animTimerId = setInterval(() => {
       if (this.isMonitoringActive && this.currentAlertState === AlertState.MONITORING) {
         const contracted: boolean = this.ringScale < 1.0;
@@ -102,19 +143,88 @@ export struct WatchPage {
     this.alertService.stopEmergencyAlert();
   }
 
+  private getActiveThreshold(): number {
+    if (this.activePhase === 1) {
+      return VitalsEngine.PHASE1_THRESHOLD;
+    }
+    if (this.activePhase === 2) {
+      return this.personalThreshold > VitalsEngine.PHASE1_THRESHOLD ? this.personalThreshold : 5.44;
+    }
+    return 3.7;
+  }
+
+  private buildGuardText(): string {
+    if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+      return 'Alerts start after 75m';
+    }
+    if (!this.vitals.isSedentary) {
+      return 'Moving — check paused';
+    }
+    if (this.vitals.alertsTonight >= VitalsEngine.MAX_ALERTS_PER_NIGHT) {
+      return 'Max 2 alerts reached tonight';
+    }
+    if (this.vitals.cooldownMinutes > 0) {
+      return `Cooldown ${this.vitals.cooldownMinutes}m • ${this.vitals.alertsTonight}/2 alerts`;
+    }
+    return `Checks ${this.vitals.streakCount}/${this.vitals.streakRequired} • ${this.vitals.alertsTonight}/2 alerts`;
+  }
+
+  private refreshStatusText(): void {
+    if (!this.isMonitoringActive) {
+      this.simStatus = 'Standby - tap START';
+      this.hapticStatus = `Checks 0/${VitalsEngine.getStreakRequired(this.phenotype)} • Max 2/night`;
+      return;
+    }
+    if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+      this.simStatus = `${VitalsEngine.getPhaseShort(this.activePhase)} • Learning sleep`;
+    } else {
+      this.simStatus = `${VitalsEngine.getPhaseShort(this.activePhase)} • Base OK`;
+    }
+    this.hapticStatus = this.buildGuardText();
+  }
+
+  private syncVitalsIdle(): void {
+    this.vitals = VitalsEngine.createInitialVitals(this.phenotype, this.activePhase, this.getActiveThreshold());
+    this.refreshStatusText();
+  }
+
   private toggleMonitoring(): void {
     this.isMonitoringActive = !this.isMonitoringActive;
     if (this.isMonitoringActive) {
       this.currentAlertState = AlertState.MONITORING;
-      this.vitals = VitalsEngine.generateNormalVitals();
-      this.simStatus = 'Monitoring...';
-      this.hapticStatus = 'Haptic: idle';
+      this.vitals = VitalsEngine.generateSteadyVitals(
+        undefined,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        75,
+        0,
+        0
+      );
     } else {
       this.alertService.stopEmergencyAlert();
       this.currentAlertState = AlertState.MONITORING;
-      this.vitals = VitalsEngine.generateNormalVitals();
-      this.simStatus = 'Standby - tap START';
-      this.hapticStatus = 'Haptic: idle';
+      this.vitals = VitalsEngine.createInitialVitals(this.phenotype, this.activePhase, this.getActiveThreshold());
+    }
+    this.refreshStatusText();
+  }
+
+  private stepElevatedCheck(): void {
+    if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
+      return;
+    }
+    this.isMonitoringActive = true;
+    this.vitals = VitalsEngine.generateElevatedStep(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      false
+    );
+    if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+      this.activateAlertFromVitals();
+    } else {
+      this.refreshStatusText();
     }
   }
 
@@ -122,30 +232,117 @@ export struct WatchPage {
     if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
       return;
     }
-    this.currentAlertState = AlertState.CRITICAL_ALERT;
-    this.vitals = VitalsEngine.generateCriticalVitals(this.vitals);
-    this.alertService.startEmergencyAlert();
+    this.isMonitoringActive = true;
+    this.vitals = VitalsEngine.generateElevatedStep(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      true
+    );
+    if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+      this.activateAlertFromVitals();
+    } else {
+      this.refreshStatusText();
+    }
   }
 
-  private dropStep(): void {
-    if (this.currentAlertState === AlertState.CRITICAL_ALERT) {
-      return;
-    }
+  private activateAlertFromVitals(): void {
+    this.vitals.alertsTonight = Math.min(VitalsEngine.MAX_ALERTS_PER_NIGHT, this.vitals.alertsTonight + 1);
+    this.currentAlertState = AlertState.CRITICAL_ALERT;
+    this.alertService.startEmergencyAlert();
+    HistoryRepository.updateTonightCrisis(
+      this.vitals.symptomRiskPct,
+      this.vitals.heuristicScore,
+      this.vitals.reasonSummary,
+      this.vitals.alertsTonight,
+      'Maria Santos',
+      '+63 917 123 4567',
+      this.activePhase
+    );
+  }
+
+  private toggleMotionGate(): void {
     this.isMonitoringActive = true;
-    this.vitals = VitalsEngine.dropTowardsHypo(this.vitals);
-    if (VitalsEngine.isCritical(this.vitals.glucose)) {
-      this.triggerCrisisAlert();
+    this.currentAlertState = AlertState.MONITORING;
+    if (this.vitals.isSedentary) {
+      this.vitals = VitalsEngine.generateMovingVitals(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold()
+      );
     } else {
-      this.simStatus = `Dropping: ${this.vitals.glucose.toFixed(1)} mmol/L`;
+      this.vitals = VitalsEngine.generateSteadyVitals(
+        this.vitals,
+        this.phenotype,
+        this.activePhase,
+        this.getActiveThreshold(),
+        75,
+        this.vitals.alertsTonight,
+        this.vitals.cooldownMinutes
+      );
     }
+    this.refreshStatusText();
+  }
+
+  private startBaselineWarmup(): void {
+    this.isMonitoringActive = true;
+    this.currentAlertState = AlertState.MONITORING;
+    this.vitals = VitalsEngine.generateBaselineVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      35
+    );
+    this.refreshStatusText();
+  }
+
+  private togglePhenotype(): void {
+    this.phenotype = this.phenotype === BodyPhenotype.ADRENERGIC
+      ? BodyPhenotype.BRADYCARDIC
+      : BodyPhenotype.ADRENERGIC;
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      this.vitals.baselineMinutes,
+      this.vitals.alertsTonight,
+      this.vitals.cooldownMinutes
+    );
+    this.refreshStatusText();
+  }
+
+  private cyclePhase(): void {
+    this.activePhase = this.activePhase === 1 ? 2 : (this.activePhase === 2 ? 3 : 1);
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      this.vitals.baselineMinutes,
+      this.vitals.alertsTonight,
+      this.vitals.cooldownMinutes
+    );
+    this.refreshStatusText();
   }
 
   private dismissAlert(): void {
     this.alertService.stopEmergencyAlert();
     this.currentAlertState = AlertState.MONITORING;
-    this.vitals = VitalsEngine.generateNormalVitals();
-    this.simStatus = 'Monitoring resumed';
-    this.hapticStatus = 'Haptic: idle';
+    HistoryRepository.updateTonightResolved();
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      75,
+      this.vitals.alertsTonight,
+      VitalsEngine.COOLDOWN_MINUTES
+    );
+    this.refreshStatusText();
     this.goToPage(0);
   }
 
@@ -233,17 +430,31 @@ export struct WatchPage {
             testToolsOpen: $testToolsOpen,
             autoScheduleEnabled: $autoScheduleEnabled,
             isPhoneConnected: this.isPhoneConnected,
+            phenotype: this.phenotype,
+            activePhase: this.activePhase,
             scheduleStartTime: this.scheduleStartTime,
             scheduleEndTime: this.scheduleEndTime,
             currentPage: this.currentPage,
             onGoToPage: (index: number) => {
               this.goToPage(index);
             },
-            onDropStep: () => {
-              this.dropStep();
+            onStepCheck: () => {
+              this.stepElevatedCheck();
             },
             onTriggerCrisis: () => {
               this.triggerCrisisAlert();
+            },
+            onToggleMotion: () => {
+              this.toggleMotionGate();
+            },
+            onStartBaseline: () => {
+              this.startBaselineWarmup();
+            },
+            onTogglePhenotype: () => {
+              this.togglePhenotype();
+            },
+            onCyclePhase: () => {
+              this.cyclePhase();
             },
             onOpenTimeEdit: (isStart: boolean) => {
               this.openTimeEdit(isStart);

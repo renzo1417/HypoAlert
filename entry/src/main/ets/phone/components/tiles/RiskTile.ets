@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Metric tile for hypoglycemia risk gauge and clinical status.
+ * Phone Companion — Metric tile for symptom risk gauge and status.
  */
 
-import { riskColor, riskShort, riskHint, riskWords } from '../../utils/PhoneRiskUtils';
+import { riskColor, riskShort, riskHint } from '../../utils/PhoneRiskUtils';
 
 @Component
 export struct RiskTile {
@@ -11,7 +11,7 @@ export struct RiskTile {
 
   build() {
     Column({ space: 6 }) {
-      Text('RISK')
+      Text('SYMPTOM RISK')
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
         .fontColor('#8A94A6')
@@ -35,7 +35,7 @@ export struct RiskTile {
         .color(riskColor(this.riskIndex))
         .backgroundColor('#E7EDF5')
 
-      Text(`${this.riskIndex} of 100 — ${riskWords(this.riskIndex)}`)
+      Text(`${this.riskIndex}% symptom risk tonight`)
         .fontSize(11)
         .fontColor('#8A94A6')
         .width('100%')

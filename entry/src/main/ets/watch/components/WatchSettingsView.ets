@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Wearable — Screen 2: Settings, simulation triggers, and sleep schedule configuration.
+ * Wearable — Screen 3: Settings, Phase 1-3 profile view, demo tools, and sleep schedule.
  */
 
+import { BodyPhenotype, DetectionPhase, VitalsEngine } from '../../models/VitalsModel';
 import { format12H } from '../../common/utils/TimeUtils';
 import { WatchPageDots } from './WatchPageDots';
 
@@ -11,12 +12,18 @@ export struct WatchSettingsView {
   @Link testToolsOpen: boolean;
   @Link autoScheduleEnabled: boolean;
   @Prop isPhoneConnected: boolean = true;
+  @Prop phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
+  @Prop activePhase: DetectionPhase = 1;
   @Prop scheduleStartTime: string = '22:00';
   @Prop scheduleEndTime: string = '06:00';
-  @Prop currentPage: number = 1;
+  @Prop currentPage: number = 2;
   onGoToPage: (page: number) => void = () => {};
-  onDropStep: () => void = () => {};
+  onStepCheck: () => void = () => {};
   onTriggerCrisis: () => void = () => {};
+  onToggleMotion: () => void = () => {};
+  onStartBaseline: () => void = () => {};
+  onTogglePhenotype: () => void = () => {};
+  onCyclePhase: () => void = () => {};
   onOpenTimeEdit: (isStart: boolean) => void = () => {};
   onTogglePhoneConnection: () => void = () => {};
 
@@ -51,7 +58,7 @@ export struct WatchSettingsView {
         .width('100%')
         .alignItems(VerticalAlign.Center)
 
-        // Phone connection card (Demo)
+        // Phone connection card
         Column({ space: 2 }) {
           Row() {
             Row({ space: 4 }) {
@@ -82,8 +89,56 @@ export struct WatchSettingsView {
         .backgroundColor('#14181F')
         .borderRadius(12)
 
-        // Test tools demo dropdown: "+" collapsed, "–" expanded.
-        Column({ space: 3 }) {
+        // Detection Profile & Active Phase Card
+        Column({ space: 4 }) {
+          Row() {
+            Text('Body Type')
+              .fontSize(8)
+              .fontColor('#8A8F98')
+              .layoutWeight(1)
+            Button(this.phenotype === BodyPhenotype.ADRENERGIC ? 'Adren. (3x)' : 'Blunted (2x)')
+              .fontSize(8)
+              .height(20)
+              .padding({ left: 7, right: 7 })
+              .backgroundColor('#232A34')
+              .fontColor('#00E5FF')
+              .borderRadius(10)
+              .onClick(() => {
+                this.onTogglePhenotype();
+              })
+          }
+          .width('100%')
+
+          Row() {
+            Text('Phase')
+              .fontSize(8)
+              .fontColor('#8A8F98')
+              .layoutWeight(1)
+            Button(VitalsEngine.getPhaseShort(this.activePhase))
+              .fontSize(8)
+              .height(20)
+              .padding({ left: 7, right: 7 })
+              .backgroundColor('#232A34')
+              .fontColor('#E8EBEF')
+              .borderRadius(10)
+              .onClick(() => {
+                this.onCyclePhase();
+              })
+          }
+          .width('100%')
+
+          Text('75m baseline • 30m rest • max 2/night')
+            .fontSize(7)
+            .fontColor('#6E747D')
+            .width('100%')
+        }
+        .width('100%')
+        .padding({ top: 6, bottom: 6, left: 8, right: 8 })
+        .backgroundColor('#14181F')
+        .borderRadius(12)
+
+        // Test tools demo dropdown
+        Column({ space: 4 }) {
           Button() {
             Row() {
               Text('Test tools')
@@ -104,34 +159,59 @@ export struct WatchSettingsView {
             .alignItems(VerticalAlign.Center)
           }
           .width('100%')
-          .height(28)
+          .height(26)
           .backgroundColor(Color.Transparent)
           .onClick(() => {
             this.testToolsOpen = !this.testToolsOpen;
           })
 
           if (this.testToolsOpen) {
-            Row({ space: 8 }) {
-              Button('Drop')
-                .fontSize(10)
-                .height(32)
+            Row({ space: 6 }) {
+              Button('+1 Check')
+                .fontSize(9)
+                .height(28)
                 .layoutWeight(1)
                 .backgroundColor('#232A34')
-                .fontColor('#9AA0A8')
-                .borderRadius(18)
+                .fontColor('#FFB74D')
+                .borderRadius(14)
                 .onClick(() => {
-                  this.onDropStep();
+                  this.onStepCheck();
                 })
 
-              Button('Crisis')
-                .fontSize(10)
-                .height(32)
+              Button('Surge')
+                .fontSize(9)
+                .height(28)
+                .layoutWeight(1)
+                .backgroundColor('#3A191D')
+                .fontColor('#FF6B6B')
+                .borderRadius(14)
+                .onClick(() => {
+                  this.onTriggerCrisis();
+                })
+            }
+            .width('100%')
+
+            Row({ space: 6 }) {
+              Button('Moving')
+                .fontSize(9)
+                .height(26)
                 .layoutWeight(1)
                 .backgroundColor('#232A34')
                 .fontColor('#9AA0A8')
-                .borderRadius(18)
+                .borderRadius(13)
                 .onClick(() => {
-                  this.onTriggerCrisis();
+                  this.onToggleMotion();
+                })
+
+              Button('75m Base')
+                .fontSize(9)
+                .height(26)
+                .layoutWeight(1)
+                .backgroundColor('#232A34')
+                .fontColor('#00E5FF')
+                .borderRadius(13)
+                .onClick(() => {
+                  this.onStartBaseline();
                 })
             }
             .width('100%')
@@ -193,6 +273,9 @@ export struct WatchSettingsView {
             .alignItems(HorizontalAlign.Start)
           }
           .width('100%')
+          .onClick(() => {
+            this.onOpenTimeEdit(true);
+          })
 
           Text('Configured via Phone Companion')
             .fontSize(7)
@@ -204,8 +287,7 @@ export struct WatchSettingsView {
         .backgroundColor('#14181F')
         .borderRadius(12)
 
-        // Spacer to lift dots onto matching alignment
-        Blank().height(10)
+        Blank().height(8)
 
         WatchPageDots({
           currentPage: this.currentPage,
@@ -238,7 +320,7 @@ struct WatchSettingsViewPreview {
       autoScheduleEnabled: $autoScheduleEnabled,
       scheduleStartTime: '22:00',
       scheduleEndTime: '06:00',
-      currentPage: 1
+      currentPage: 2
     })
   }
 }

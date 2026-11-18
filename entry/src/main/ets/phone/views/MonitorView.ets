@@ -1,43 +1,50 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Screen 1: Bedside Nocturnal Guardian Monitor.
- * Ultra-clean, distraction-free bedside dashboard designed for nighttime glanceability.
+ * Phone Companion — Screen 1: Huawei Health Bedside Nocturnal Monitor & Finger-Prick Check-In.
  */
 
+import { GateProgress, VitalsData, VitalsEngine } from '../../models/VitalsModel';
+import { HistoryRepository } from '../../models/HistoryModel';
 import { PhoneHeroCard } from '../components/PhoneHeroCard';
 import { PhoneMetricGrid } from '../components/PhoneMetricGrid';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct MonitorView {
-  @Prop glucose: number = 5.5;
-  @Prop riskIndex: number = 12;
+  @Prop vitals: VitalsData = VitalsEngine.createInitialVitals();
+  @Prop gateProgress: GateProgress = HistoryRepository.getGateProgress();
   @Prop currentTime: string = '00:00:00';
-  @Prop heartRate: number = 62;
   @Prop watchBattery: number = 86;
-  @Prop tremorPSD: number = 0.12;
-  @Prop skinTemp: number = 36.0;
-  @Prop bannerFlash: boolean = false;
   @Prop isWatchConnected: boolean = true;
+  @Prop pendingPrickCheck: boolean = false;
   @Prop caregiverName: string = 'Maria Santos';
   @Prop caregiverPhone: string = '+63 917 123 4567';
+  @State prickInputText: string = '';
   ppgContext: CanvasRenderingContext2D | null = null;
   onCanvasReady: () => void = () => {};
   onCallNow: () => void = () => {};
   onMarkWithThem: () => void = () => {};
   onConnectWatch: () => void = () => {};
+  onLogFingerPrick: (mgDl: number) => void = () => {};
   onNavigateTab: (index: number) => void = () => {};
+
+  private submitCustomPrick(): void {
+    const val: number = parseInt(this.prickInputText.trim());
+    if (!isNaN(val) && val >= 20 && val <= 600) {
+      this.onLogFingerPrick(val);
+      this.prickInputText = '';
+    }
+  }
 
   build() {
     Scroll() {
       Column({ space: 12 }) {
-        // Watch offline reminder (single line)
         if (!this.isWatchConnected) {
           Row({ space: 10 }) {
             Circle({ width: 6, height: 6 })
               .fill(PhoneTheme.STATE_WARN)
 
-            Text('Watch offline — reconnect to resume')
+            Text('Watch offline — wearable still monitors locally')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
@@ -68,7 +75,7 @@ export struct MonitorView {
 
         // Section: Tonight
         Row() {
-          Text('Tonight')
+          Text('Tonight • Huawei Health')
             .fontSize(PhoneTheme.FONT_SECTION)
             .fontWeight(FontWeight.Bold)
             .fontColor(PhoneTheme.TEXT_PRIMARY)
@@ -81,29 +88,115 @@ export struct MonitorView {
         .padding({ left: 2, right: 2 })
         .alignItems(VerticalAlign.Center)
 
-        // Primary hero: single dominant reading
+        // Hero Symptom Risk Card
         PhoneHeroCard({
-          glucose: this.glucose,
-          riskIndex: this.riskIndex,
+          vitals: this.vitals,
           currentTime: this.currentTime,
-          heartRate: this.heartRate,
           watchBattery: this.watchBattery,
-          bannerFlash: this.bannerFlash,
           isWatchConnected: this.isWatchConnected,
           onCallNow: this.onCallNow,
           onMarkWithThem: this.onMarkWithThem
         })
 
-        // Section: Vitals
+        // Morning / Buzz-Linked Finger-Prick Check-In Card (real BGM ground truth)
+        Column({ space: 8 }) {
+          Row() {
+            Text(this.pendingPrickCheck ? 'Log Buzz Finger-Prick Check' : 'Morning Finger-Prick Check')
+              .fontSize(PhoneTheme.FONT_SECTION)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
+
+            Text(this.gateProgress.isCnnUnlocked
+              ? '1D-CNN Active'
+              : (this.gateProgress.hasPersonalLine ? 'Personal Line Ready' : `Pricks ${this.gateProgress.buzzLinkedPricks}/3`))
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.pendingPrickCheck ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.BRAND_ACCENT)
+              .backgroundColor(this.pendingPrickCheck ? PhoneTheme.STATE_WARN_BG : PhoneTheme.BRAND_ACCENT_BG)
+              .borderRadius(PhoneTheme.PILL_RADIUS)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          }
+          .width('100%')
+
+          Text(this.pendingPrickCheck
+            ? 'Watch buzzed — type your real finger-prick reading (mg/dL) so the watch learns if it was right.'
+            : 'Log 1 morning blood sugar check (mg/dL) to unlock Phase 2 personal cutoff & Phase 3 1D-CNN.')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_MUTED)
+            .width('100%')
+
+          Row({ space: 8 }) {
+            TextInput({ placeholder: 'e.g. 54 or 105 mg/dL', text: this.prickInputText })
+              .type(InputType.Number)
+              .layoutWeight(1)
+              .height(40)
+              .fontSize(PhoneTheme.FONT_BODY)
+              .backgroundColor(PhoneTheme.BG_SUBTLE)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .padding({ left: 10, right: 10 })
+              .onChange((val: string) => {
+                this.prickInputText = val;
+              })
+
+            Button('Save')
+              .height(40)
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Bold)
+              .backgroundColor(PhoneTheme.BRAND_PRIMARY)
+              .fontColor(PhoneTheme.TEXT_ON_DARK)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .padding({ left: 14, right: 14 })
+              .onClick(() => {
+                this.submitCustomPrick();
+              })
+          }
+          .width('100%')
+
+          Row({ space: 8 }) {
+            Button('Quick: 54 mg/dL (Low)')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontWeight(FontWeight.Medium)
+              .height(34)
+              .layoutWeight(1)
+              .backgroundColor(PhoneTheme.STATE_CRIT_BG)
+              .fontColor(PhoneTheme.STATE_CRIT_TEXT)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onLogFingerPrick(54);
+              })
+
+            Button('Quick: 108 mg/dL (Fine)')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontWeight(FontWeight.Medium)
+              .height(34)
+              .layoutWeight(1)
+              .backgroundColor(PhoneTheme.STATE_OK_BG)
+              .fontColor(PhoneTheme.STATE_OK_TEXT)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onLogFingerPrick(108);
+              })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(this.pendingPrickCheck ? PhoneTheme.STATE_WARN : PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+
+        // Section: Live Symptom Vitals
         Row() {
-          Text('Vitals')
+          Text('What the watch checks')
             .fontSize(PhoneTheme.FONT_SECTION)
             .fontWeight(FontWeight.Bold)
             .fontColor(PhoneTheme.TEXT_PRIMARY)
             .layoutWeight(1)
           Circle({ width: 6, height: 6 })
             .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.TEXT_TERTIARY)
-          Text(this.isWatchConnected ? 'Live' : 'Paused')
+          Text(this.isWatchConnected ? ' Live 5m' : ' Autonomous')
             .fontSize(PhoneTheme.FONT_CAPTION)
             .fontColor(PhoneTheme.TEXT_MUTED)
         }
@@ -111,17 +204,13 @@ export struct MonitorView {
         .padding({ left: 2, right: 2 })
         .alignItems(VerticalAlign.Center)
 
-        // Quiet secondary vitals
         PhoneMetricGrid({
-          heartRate: this.heartRate,
-          tremorPSD: this.tremorPSD,
-          skinTemp: this.skinTemp,
-          riskIndex: this.riskIndex,
+          vitals: this.vitals,
           ppgContext: this.ppgContext,
           onCanvasReady: this.onCanvasReady
         })
 
-        // Section: Caregiver — always visible call path
+        // Caregiver quick path
         Row({ space: 12 }) {
           Stack({ alignContent: Alignment.Center }) {
             Circle({ width: 40, height: 40 })

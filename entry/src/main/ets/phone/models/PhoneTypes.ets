@@ -18,5 +18,5 @@ export interface TremorBand {
 
 export interface OvernightPoint {
   hour: string;
-  value: number;
+  riskPct: number;
 }

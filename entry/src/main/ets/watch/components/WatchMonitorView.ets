@@ -1,30 +1,63 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Wearable — Screen 1: Primary Monitor dial with real-time vitals and pulsating ring.
+ * Wearable — Screen 1: Primary Monitor dial showing symptom risk, 75-min baseline, and streak state.
  */
 
-import { VitalsData } from '../../models/VitalsModel';
+import { BodyPhenotype, VitalsData, VitalsEngine } from '../../models/VitalsModel';
 import { format12H } from '../../common/utils/TimeUtils';
 import { WatchPageDots } from './WatchPageDots';
 
 @Component
 export struct WatchMonitorView {
   @Prop isMonitoringActive: boolean = false;
-  @Prop vitals: VitalsData = {
-    pulse: 62,
-    skinTemp: 36.0,
-    tremorIndex: 0.2,
-    glucose: 5.4,
-    timestamp: '12:23 PM'
-  };
+  @Prop vitals: VitalsData = VitalsEngine.createInitialVitals(BodyPhenotype.ADRENERGIC, 1, 3.7);
   @Prop ringScale: number = 1.0;
   @Prop ringOpacity: number = 0.9;
   @Prop simStatus: string = 'Standby - tap START';
-  @Prop hapticStatus: string = 'Haptic: idle';
+  @Prop hapticStatus: string = 'Checks 0/3 • Max 2/night';
   @Prop currentPage: number = 0;
   @Prop isPhoneConnected: boolean = true;
   onToggleMonitoring: () => void = () => {};
   onSelectPage: (page: number) => void = () => {};
+
+  private getRingStrokeColor(): string {
+    if (!this.isMonitoringActive) {
+      return '#23262B';
+    }
+    if (this.vitals.statusTier === 'WATCH') {
+      return '#FFB74D';
+    }
+    if (this.vitals.statusTier === 'MOVING') {
+      return '#6E747D';
+    }
+    return '#00A9CE';
+  }
+
+  private getStatusColor(): string {
+    if (this.vitals.statusTier === 'ALERT') {
+      return '#FF5252';
+    }
+    if (this.vitals.statusTier === 'WATCH') {
+      return '#FFB74D';
+    }
+    if (this.vitals.statusTier === 'MOVING') {
+      return '#9AA0A8';
+    }
+    if (this.vitals.statusTier === 'BASELINE' || this.vitals.statusTier === 'COOLDOWN') {
+      return '#00E5FF';
+    }
+    return '#00E676';
+  }
+
+  private getSubVitalLabel(): string {
+    if (!this.vitals.isSedentary) {
+      return `${this.vitals.pulse} BPM • Moving`;
+    }
+    if (this.vitals.tremorIndex >= 0.14) {
+      return `${this.vitals.pulse} BPM • Tremor`;
+    }
+    return `${this.vitals.pulse} BPM • HRV ${this.vitals.rmssd}`;
+  }
 
   build() {
     Column() {
@@ -58,7 +91,7 @@ export struct WatchMonitorView {
         Stack({ alignContent: Alignment.Center }) {
           Circle({ width: 116, height: 116 })
             .fill(Color.Transparent)
-            .stroke(this.isMonitoringActive ? '#00A9CE' : '#23262B')
+            .stroke(this.getRingStrokeColor())
             .strokeWidth(3)
             .opacity(this.isMonitoringActive ? this.ringOpacity : 0.7)
             .scale({ x: this.ringScale, y: this.ringScale })
@@ -78,26 +111,74 @@ export struct WatchMonitorView {
                   .textAlign(TextAlign.Center)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
+              } else if (this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+                Text(`${this.vitals.baselineMinutes}m`)
+                  .fontSize(21)
+                  .fontWeight(FontWeight.Bolder)
+                  .fontColor('#FFFFFF')
+                  .textAlign(TextAlign.Center)
+
+                Text('OF 75M SETUP')
+                  .fontSize(8)
+                  .fontColor('#9AA0A8')
+                  .textAlign(TextAlign.Center)
+
+                Text('Learning sleep')
+                  .fontSize(9)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#00E5FF')
+                  .textAlign(TextAlign.Center)
+
+                Text(`${this.vitals.pulse} BPM • Still`)
+                  .fontSize(9)
+                  .fontColor('#9AA0A8')
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              } else if (!this.vitals.isSedentary) {
+                Text('PAUSED')
+                  .fontSize(15)
+                  .fontWeight(FontWeight.Bolder)
+                  .fontColor('#FFB74D')
+                  .textAlign(TextAlign.Center)
+
+                Text('MOVING')
+                  .fontSize(8)
+                  .fontColor('#9AA0A8')
+                  .textAlign(TextAlign.Center)
+
+                Text('Wait till still')
+                  .fontSize(9)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#9AA0A8')
+                  .textAlign(TextAlign.Center)
+
+                Text(`${this.vitals.pulse} BPM • Awake`)
+                  .fontSize(9)
+                  .fontColor('#6E747D')
+                  .textAlign(TextAlign.Center)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
               } else {
-                Text(`${this.vitals.glucose.toFixed(1)}`)
+                Text(`${this.vitals.symptomRiskPct}%`)
                   .fontSize(22)
                   .fontWeight(FontWeight.Bolder)
                   .fontColor('#FFFFFF')
                   .textAlign(TextAlign.Center)
 
-                Text('mmol/L')
-                  .fontSize(9)
+                Text('SYMPTOM RISK')
+                  .fontSize(7.5)
                   .fontColor('#9AA0A8')
                   .textAlign(TextAlign.Center)
 
-                Text('Stable')
+                Text(this.vitals.statusWord)
                   .fontSize(10)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor('#00E676')
+                  .fontColor(this.getStatusColor())
                   .textAlign(TextAlign.Center)
 
-                Text(`${this.vitals.pulse} BPM`)
-                  .fontSize(10)
+                Text(this.getSubVitalLabel())
+                  .fontSize(9)
                   .fontColor('#9AA0A8')
                   .textAlign(TextAlign.Center)
                   .maxLines(1)
@@ -115,7 +196,7 @@ export struct WatchMonitorView {
           .backgroundColor('#101318')
           .shadow(this.isMonitoringActive ? {
             radius: 12,
-            color: '#00E5FF',
+            color: this.getRingStrokeColor(),
             offsetX: 0,
             offsetY: 0,
             fill: false
@@ -181,13 +262,9 @@ struct WatchMonitorViewPreview {
   build() {
     WatchMonitorView({
       isMonitoringActive: true,
-      vitals: {
-        pulse: 61,
-        skinTemp: 36.0,
-        tremorIndex: 0.2,
-        glucose: 5.4,
-        timestamp: '23:30'
-      }
+      vitals: VitalsEngine.createInitialVitals(BodyPhenotype.ADRENERGIC, 3, 3.7),
+      simStatus: 'P3 1D-CNN • Base OK',
+      hapticStatus: 'Checks 0/3 • 0/2 alerts'
     })
   }
 }

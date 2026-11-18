@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HypoAlert — Huawei Health Companion &amp; Watch Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link visually-hidden" href="#main-demo">Skip to Huawei Health demo</a>
+
+  <header class="top-banner">
+    <div class="top-banner-inner">
+      <div class="brand-block">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <div>
+          <h1>HypoAlert — Symptom-Based Nocturnal Guardian</h1>
+          <p class="subtitle">Huawei Health Companion Demo &amp; Live Watch Mirror (No Blood Glucose Sensor Needed)</p>
+        </div>
+      </div>
+      <div class="safety-pills" aria-label="Core safety rules">
+        <span class="safety-pill">75m silent baseline</span>
+        <span class="safety-pill">3/2 checks in a row</span>
+        <span class="safety-pill">30m cooldown • max 2/night</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-demo" class="workspace">
+    <!-- Left Column: Demo Controls & Live Circular Watch Mirror -->
+    <aside class="demo-column" aria-label="Interactive scenario controls and watch preview">
+      <section class="panel-card" aria-labelledby="watch-mirror-heading">
+        <div class="panel-head">
+          <h2 id="watch-mirror-heading">Huawei Watch Screen (Live Mirror)</h2>
+          <span id="watch-link-pill" class="mini-pill ok">Phone Linked</span>
+        </div>
+
+        <div class="watch-bezel" aria-live="polite" aria-atomic="true">
+          <div id="watch-screen" class="watch-screen">
+            <div class="watch-topbar">
+              <span class="watch-brand"><span class="watch-dot" aria-hidden="true"></span>HYPOALERT</span>
+              <span id="watch-clock" class="watch-clock">02:45 AM</span>
+            </div>
+
+            <div id="watch-ring" class="watch-ring state-steady">
+              <div class="watch-dial">
+                <div id="watch-hero-value" class="watch-hero">12%</div>
+                <div id="watch-hero-unit" class="watch-unit">SYMPTOM RISK</div>
+                <div id="watch-hero-state" class="watch-state">Steady</div>
+                <div id="watch-hero-vitals" class="watch-subvitals">62 BPM • Calm</div>
+              </div>
+            </div>
+
+            <div class="watch-footer-lines">
+              <div id="watch-line-1" class="watch-line-1">P1 Warm-Up • Base OK</div>
+              <div id="watch-line-2" class="watch-line-2">Checks 0/3 • 0/2 alerts</div>
+            </div>
+
+            <div id="watch-alert-overlay" class="watch-alert-overlay" hidden>
+              <div id="watch-alert-title" class="wa-title">POSSIBLE LOW</div>
+              <div id="watch-alert-risk" class="wa-risk">84% RISK</div>
+              <div id="watch-alert-reason" class="wa-reason">Fast pulse &amp; wrist tremor</div>
+              <div class="wa-box">
+                <div id="watch-alert-sms">SMS sent to caregiver (1/2 tonight)</div>
+                <div>Check blood sugar &amp; log on phone</div>
+              </div>
+              <div id="watch-alert-vitals" class="wa-vitals">98 BPM • HRV 16ms</div>
+              <button type="button" id="watch-awake-btn" class="wa-awake-btn">I'M AWAKE</button>
+              <div class="wa-hint">Pauses 30m • Silences buzz</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-card" aria-labelledby="sim-controls-heading">
+        <h2 id="sim-controls-heading">Demo Controls (Test Every Rule)</h2>
+        <p class="panel-hint">See how the watch checks symptoms every 5 minutes without ever faking blood sugar.</p>
+
+        <div class="control-group">
+          <span class="control-label">Body Response Type</span>
+          <div class="seg-row" role="group" aria-label="Body response type">
+            <button type="button" id="btn-type-adr" class="seg-btn active" aria-pressed="true">Adrenergic (3 checks)</button>
+            <button type="button" id="btn-type-brady" class="seg-btn" aria-pressed="false">Blunted (2 checks)</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Active Detection Phase</span>
+          <div class="seg-row" role="group" aria-label="Detection phase">
+            <button type="button" id="btn-phase-1" class="seg-btn active" aria-pressed="true">P1: Fixed 3.7</button>
+            <button type="button" id="btn-phase-2" class="seg-btn" aria-pressed="false">P2: My Line</button>
+            <button type="button" id="btn-phase-3" class="seg-btn" aria-pressed="false">P3: 1D-CNN</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Sleep &amp; Symptom Scenarios</span>
+          <div class="scenario-grid">
+            <button type="button" id="sc-baseline" class="sc-btn">75m Silent Baseline</button>
+            <button type="button" id="sc-steady" class="sc-btn">Calm Normal Sleep</button>
+            <button type="button" id="sc-spike" class="sc-btn">1 Spike (Ignored!)</button>
+            <button type="button" id="sc-step" class="sc-btn">+1 Elevated Check</button>
+            <button type="button" id="sc-surge" class="sc-btn sc-danger">Sustained Surge (Alert)</button>
+            <button type="button" id="sc-moving" class="sc-btn">Moving (Paused)</button>
+          </div>
+        </div>
+
+        <div class="control-footer">
+          <button type="button" id="sc-reset-night" class="btn-outline-sm">Reset Night (0/2 Alerts)</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Right Column: Huawei Health Companion Phone Interface (Evolved from HyGly/phone-mock) -->
+    <section class="phone-column" aria-label="Huawei Health companion interface">
+      <div class="phone-shell">
+        <header class="phone-nav">
+          <div class="phone-nav-left">
+            <span class="nav-chevron" aria-hidden="true">‹</span>
+            <div>
+              <div class="nav-title">HypoAlert</div>
+              <div id="nav-watch-sub" class="nav-sub">Huawei Health • Connected WATCH</div>
+            </div>
+          </div>
+          <span id="nav-phase-chip" class="phase-chip">Phase 1 • Warm-Up</span>
+        </header>
+
+        <div role="tablist" aria-label="Huawei Health HypoAlert sections" class="hh-tablist">
+          <button type="button" role="tab" id="tab-monitor" aria-selected="true" class="hh-tab">
+            Monitor &amp; Alerts
+          </button>
+          <button type="button" role="tab" id="tab-settings" aria-selected="false" class="hh-tab">
+            Setup &amp; Settings
+          </button>
+        </div>
+
+        <div id="status-announcer" class="visually-hidden" aria-live="polite"></div>
+
+        <!-- TAB 1: Monitor & Alert Detail (evolved from HyGly/phone-mock/alert-detail.html) -->
+        <div role="tabpanel" id="panel-monitor" aria-labelledby="tab-monitor" class="hh-tabpanel">
+          <div class="panel-inner">
+            <!-- Hero Status Card -->
+            <div id="hh-hero-card" class="alert-card state-steady">
+              <div class="alert-top">
+                <span id="hh-live-time">02:45 AM • Live 5m</span>
+                <span id="hh-sms-badge">Monitoring</span>
+              </div>
+              <div class="alert-value">
+                <span id="hh-risk-val">12%</span>
+                <small id="hh-risk-unit">symptom risk</small>
+              </div>
+              <div id="hh-hero-msg" class="alert-msg">All steady — heart rate, HRV, and stillness match tonight's sleep.</div>
+              <div class="alert-row">
+                <span class="pill" id="hh-streak-pill">Checks: 0/3</span>
+                <span class="pill" id="hh-cap-pill">Alerts: 0/2 tonight</span>
+                <span class="pill" id="hh-reason-pill">Within baseline</span>
+              </div>
+            </div>
+
+            <div id="hh-alert-banner" class="crisis-callout" role="alert" hidden>
+              <strong>Possible low symptoms sustained!</strong> Tap "I'm awake" to silence the watch for 30 minutes, then log a finger-prick check.
+            </div>
+
+            <!-- Live Vitals (4 Core Signals + Motion Gate, Zero Skin Temp, Zero Fake Glucose) -->
+            <div class="card">
+              <div class="card-header-row">
+                <h3>What the watch checks</h3>
+                <span id="hh-motion-badge" class="badge-pill ok">Lying still • Active</span>
+              </div>
+              <div class="vitals-grid">
+                <div class="metric">
+                  <b id="hh-hr-val">62</b>
+                  <span class="metric-name">Heart rate (bpm)</span>
+                  <span id="hh-hr-sub" class="metric-sub">Resting normal</span>
+                </div>
+                <div class="metric">
+                  <b id="hh-hrv-val">42</b>
+                  <span class="metric-name">HRV calmness (ms)</span>
+                  <span id="hh-hrv-sub" class="metric-sub">SDNN 54 ms</span>
+                </div>
+                <div class="metric">
+                  <b id="hh-tremor-val">Calm</b>
+                  <span class="metric-name">8–12 Hz tremor</span>
+                  <span id="hh-tremor-sub" class="metric-sub">TPI 0.08</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Morning / Buzz Finger-Prick Check-In (Real BGM Ground Truth) -->
+            <div class="card" id="prick-card">
+              <div class="card-header-row">
+                <h3 id="prick-heading">Morning finger-prick check</h3>
+                <span id="prick-gate-badge" class="badge-pill info">Gate 1: 2/3 pricks</span>
+              </div>
+              <p id="prick-desc" class="card-desc">
+                Only real finger-prick checks enter blood sugar here — teaching the watch your personal line and unlocking the 1D-CNN.
+              </p>
+
+              <form id="prick-form" novalidate>
+                <div class="prick-row">
+                  <div class="field-wrap">
+                    <label for="prick-input" class="sr-label">Finger-prick blood sugar (mg/dL)</label>
+                    <input
+                      id="prick-input"
+                      name="finger_prick_mgdl"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]{2,3}"
+                      placeholder="Enter mg/dL (e.g. 54 or 108)"
+                      aria-describedby="prick-hint prick-error"
+                    >
+                  </div>
+                  <button type="submit" class="btn-inline">Save check</button>
+                </div>
+                <div id="prick-hint" class="field-hint">Below 70 = confirmed low • 70+ = fine night</div>
+                <div id="prick-error" class="field-error" role="status" aria-live="polite" hidden></div>
+              </form>
+
+              <div class="quick-prick-row">
+                <button type="button" id="quick-prick-low" class="btn-chip-low">Test: 54 mg/dL (Low)</button>
+                <button type="button" id="quick-prick-fine" class="btn-chip-ok">Test: 108 mg/dL (Fine)</button>
+              </div>
+            </div>
+
+            <!-- Overnight Symptom Risk Bars -->
+            <div class="card">
+              <div class="card-header-row">
+                <h3>Overnight symptom risk (12am–8am)</h3>
+                <span class="card-meta">Alert line 70%</span>
+              </div>
+              <div id="overnight-bars" class="bars-row" aria-label="Overnight symptom risk bars"></div>
+            </div>
+
+            <!-- Alert & Check-In History -->
+            <div class="card">
+              <div class="card-header-row">
+                <h3>Tonight's timeline</h3>
+                <span class="card-meta">Local demo (Cloud SMN planned)</span>
+              </div>
+              <ul class="timeline" id="hh-history-list"></ul>
+            </div>
+
+            <div class="btn-row">
+              <button type="button" id="hh-awake-btn" class="btn btn-ghost">I'm awake (30m rest)</button>
+              <button type="button" id="hh-call-btn" class="btn btn-primary">Call caregiver</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Setup & Alert Settings (evolved from HyGly/phone-mock/settings.html) -->
+        <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" class="hh-tabpanel" hidden>
+          <div class="panel-inner">
+            <form id="settings-form" novalidate>
+              <div class="card">
+                <h3>One-time profile setup</h3>
+                <p class="card-desc">Entered before Night 1 so the watch knows which symptom pattern to look for.</p>
+
+                <div class="form-row">
+                  <label for="set-age">Age (years)</label>
+                  <input id="set-age" name="age" type="text" inputmode="numeric" value="26">
+                </div>
+                <div class="form-row">
+                  <label for="set-t1d">Years with Type 1 diabetes</label>
+                  <input id="set-t1d" name="t1d_years" type="text" inputmode="numeric" value="8">
+                </div>
+
+                <fieldset class="radio-fieldset">
+                  <legend>Body response type</legend>
+                  <label class="radio-option">
+                    <input type="radio" name="phenotype" value="ADRENERGIC" checked>
+                    <span>
+                      <strong>Adrenergic</strong>
+                      <small>Fast heart rate + shaking. Requires 3 high checks in a row (~15 min).</small>
+                    </span>
+                  </label>
+                  <label class="radio-option">
+                    <input type="radio" name="phenotype" value="BRADYCARDIC">
+                    <span>
+                      <strong>Bradycardic / blunted</strong>
+                      <small>Quieter heart response + HRV drop. Requires 2 high checks in a row (~10 min).</small>
+                    </span>
+                  </label>
+                </fieldset>
+              </div>
+
+              <div class="card">
+                <h3>Phase 1–3 learning progress</h3>
+                <p class="card-desc">Safety rules stay constant; the score behind them upgrades as your checks prove accuracy.</p>
+                <div class="gate-item">
+                  <div class="gate-top">
+                    <span>Phase 2: Personal cutoff line</span>
+                    <strong id="gate1-label">2 / 3 buzz pricks</strong>
+                  </div>
+                  <progress id="gate1-bar" max="3" value="2"></progress>
+                </div>
+                <div class="gate-item">
+                  <div class="gate-top">
+                    <span>Phase 3: 60-min 1D-CNN (498 params)</span>
+                    <strong id="gate2-label">0 / 1 low • 6 / 10 fine</strong>
+                  </div>
+                  <progress id="gate2-bar" max="11" value="6"></progress>
+                </div>
+                <div class="phase-note" id="active-cutoff-note">
+                  Active cutoff: Fixed formula score &ge; 3.7 (Phase 1 Warm-Up)
+                </div>
+              </div>
+
+              <div class="card">
+                <h3>Caregiver &amp; alerts</h3>
+                <p class="card-desc">Max 2 alerts per night with 30-minute cooldown. Huawei Cloud SMN connects in Phase 2 of deployment.</p>
+                <div class="form-row">
+                  <label for="set-caregiver-name">Caregiver name</label>
+                  <input id="set-caregiver-name" name="caregiver_name" type="text" value="Maria Santos">
+                </div>
+                <div class="form-row">
+                  <label for="set-caregiver-phone">Caregiver phone</label>
+                  <input id="set-caregiver-phone" name="caregiver_phone" type="tel" autocomplete="tel" value="+63 917 123 4567">
+                </div>
+                <div class="form-row">
+                  <label for="set-sms-switch">Text caregiver on alert</label>
+                  <input id="set-sms-switch" type="checkbox" switch checked>
+                </div>
+                <div class="form-row">
+                  <label for="set-autocall-switch">Auto-call on sustained alert</label>
+                  <input id="set-autocall-switch" type="checkbox" switch checked>
+                </div>
+                <div class="form-row">
+                  <label for="set-night-switch">Night schedule (22:00–06:00)</label>
+                  <input id="set-night-switch" type="checkbox" switch checked>
+                </div>
+                <div class="form-row">
+                  <label for="set-vib-switch">Watch wrist vibration</label>
+                  <input id="set-vib-switch" type="checkbox" switch checked>
+                </div>
+              </div>
+
+              <button type="button" id="btn-test-sms" class="btn btn-ghost full-btn">Send test alert SMS (Demo)</button>
+              <button type="submit" class="btn btn-primary full-btn">Save Huawei Health settings</button>
+              <div id="settings-feedback" class="note" role="status" aria-live="polite">Mirrors Huawei Health • Health Alerts section</div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

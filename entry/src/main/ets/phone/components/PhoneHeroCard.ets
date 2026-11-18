@@ -1,34 +1,31 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Clinical-Grade Hero Status Card with Circular Hypoglycemia Risk Gauge.
- * Dual-readout: On-Device Sympathetic Surge Probability (0-100%) & Estimated Glycemic Trajectory (mmol/L).
+ * Phone Companion — Huawei Health Style Hero Card showing Symptom Risk, Phase, Streak, and Plain Reason.
  */
 
-import {
-  riskLevel,
-  heroSentence,
-  trendWord
-} from '../utils/PhoneRiskUtils';
+import { VitalsData, VitalsEngine } from '../../models/VitalsModel';
+import { heroSentence, riskLevel, statusBadgeText } from '../utils/PhoneRiskUtils';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
 export struct PhoneHeroCard {
-  @Prop glucose: number = 5.5;
-  @Prop riskIndex: number = 12;
+  @Prop vitals: VitalsData = VitalsEngine.createInitialVitals();
   @Prop currentTime: string = '00:00:00';
-  @Prop heartRate: number = 62;
   @Prop watchBattery: number = 86;
-  @Prop bannerFlash: boolean = false;
   @Prop isWatchConnected: boolean = true;
   onCallNow: () => void = () => {};
   onMarkWithThem: () => void = () => {};
 
   private isEmergency(): boolean {
-    return riskLevel(this.riskIndex) === 'Critical';
+    return riskLevel(this.vitals) === 'Critical';
   }
 
   private isWarning(): boolean {
-    return riskLevel(this.riskIndex) === 'Warning';
+    return riskLevel(this.vitals) === 'Warning';
+  }
+
+  private isBaseline(): boolean {
+    return this.vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES;
   }
 
   private getCardBg(): string {
@@ -45,6 +42,9 @@ export struct PhoneHeroCard {
     if (this.isWarning()) {
       return PhoneTheme.STATE_WARN;
     }
+    if (this.isBaseline()) {
+      return PhoneTheme.BRAND_ACCENT;
+    }
     return PhoneTheme.BORDER_SUBTLE;
   }
 
@@ -54,6 +54,9 @@ export struct PhoneHeroCard {
     }
     if (this.isWarning()) {
       return PhoneTheme.STATE_WARN;
+    }
+    if (this.isBaseline()) {
+      return PhoneTheme.BRAND_ACCENT;
     }
     return PhoneTheme.STATE_OK;
   }
@@ -67,19 +70,28 @@ export struct PhoneHeroCard {
 
   build() {
     Column({ space: 12 }) {
-      // Top Row: Single status pill only
+      // Top Row: Status badge + Phase chip + time
       Row() {
         Row({ space: 4 }) {
           Circle({ width: 5, height: 5 })
-            .fill(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT))
-          Text(this.isEmergency() ? 'URGENT' : (this.isWarning() ? 'WATCH' : 'STEADY'))
+            .fill(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : (this.isBaseline() ? PhoneTheme.BRAND_ACCENT : PhoneTheme.STATE_OK_TEXT)))
+          Text(statusBadgeText(this.vitals))
             .fontSize(PhoneTheme.FONT_MICRO)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT))
+            .fontColor(this.isEmergency() ? PhoneTheme.BG_CARD : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : (this.isBaseline() ? PhoneTheme.BRAND_ACCENT : PhoneTheme.STATE_OK_TEXT)))
         }
-        .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.2)' : (this.isWarning() ? PhoneTheme.STATE_WARN_BG : PhoneTheme.STATE_OK_BG))
+        .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.2)' : (this.isWarning() ? PhoneTheme.STATE_WARN_BG : (this.isBaseline() ? PhoneTheme.BRAND_ACCENT_BG : PhoneTheme.STATE_OK_BG)))
         .borderRadius(PhoneTheme.PILL_RADIUS)
         .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+
+        Text(VitalsEngine.getPhaseShort(this.vitals.phase))
+          .fontSize(PhoneTheme.FONT_MICRO)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_SECONDARY)
+          .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.16)' : PhoneTheme.BG_SUBTLE)
+          .borderRadius(PhoneTheme.PILL_RADIUS)
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .margin({ left: 6 })
 
         Blank()
 
@@ -90,28 +102,42 @@ export struct PhoneHeroCard {
       .width('100%')
       .alignItems(VerticalAlign.Center)
 
-      // Main: single dominant glucose + secondary risk ring
+      // Main: Symptom risk % or 75-min baseline progress + Ring Gauge
       Row({ space: 14 }) {
-        // Right-first on mobile: glucose block grows, ring is secondary
         Column({ space: 2 }) {
-          Text('GLUCOSE')
+          Text('HYPO SYMPTOM RISK')
             .fontSize(PhoneTheme.FONT_MICRO)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.8)' : PhoneTheme.TEXT_TERTIARY)
-          Row({ space: 4 }) {
-            Text(`${this.glucose.toFixed(1)}`)
-              .fontSize(PhoneTheme.FONT_HERO)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
+            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_TERTIARY)
 
-            Text('mmol/L')
-              .fontSize(PhoneTheme.FONT_BODY)
-              .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_MUTED)
-              .margin({ bottom: 4 })
+          if (this.isBaseline()) {
+            Row({ space: 4 }) {
+              Text(`${this.vitals.baselineMinutes}`)
+                .fontSize(PhoneTheme.FONT_HERO)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(PhoneTheme.TEXT_PRIMARY)
+              Text('/ 75 min')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontColor(PhoneTheme.TEXT_MUTED)
+                .margin({ bottom: 4 })
+            }
+            .alignItems(VerticalAlign.Bottom)
+          } else {
+            Row({ space: 4 }) {
+              Text(`${this.vitals.symptomRiskPct}%`)
+                .fontSize(PhoneTheme.FONT_HERO)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
+
+              Text(this.vitals.isSedentary ? 'symptom risk' : 'paused')
+                .fontSize(PhoneTheme.FONT_BODY)
+                .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_MUTED)
+                .margin({ bottom: 4 })
+            }
+            .alignItems(VerticalAlign.Bottom)
           }
-          .alignItems(VerticalAlign.Bottom)
 
-          Text(`${trendWord(this.riskIndex)} • Target ≥3.9`)
+          Text(`Checks: ${this.vitals.streakCount}/${this.vitals.streakRequired} in a row • Alerts: ${this.vitals.alertsTonight}/2`)
             .fontSize(PhoneTheme.FONT_CAPTION)
             .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : (this.isWarning() ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.TEXT_MUTED))
             .maxLines(1)
@@ -120,11 +146,12 @@ export struct PhoneHeroCard {
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
-        // Secondary: smaller risk ring with label
         Column({ space: 2 }) {
           Stack({ alignContent: Alignment.Center }) {
             Progress({
-              value: this.riskIndex,
+              value: this.isBaseline()
+                ? Math.round((this.vitals.baselineMinutes / VitalsEngine.BASELINE_TOTAL_MINUTES) * 100)
+                : this.vitals.symptomRiskPct,
               total: 100,
               type: ProgressType.Ring
             })
@@ -134,16 +161,16 @@ export struct PhoneHeroCard {
               .width(56)
               .height(56)
 
-            Text(`${this.riskIndex}`)
+            Text(this.isBaseline() ? `${this.vitals.baselineMinutes}m` : `${this.vitals.symptomRiskPct}`)
               .fontSize(15)
               .fontWeight(FontWeight.Bold)
               .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_PRIMARY)
           }
           .width(56)
           .height(56)
-          Text('Risk')
+          Text(this.isBaseline() ? 'Setup' : 'Risk')
             .fontSize(PhoneTheme.FONT_MICRO)
-            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.8)' : PhoneTheme.TEXT_MUTED)
+            .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.85)' : PhoneTheme.TEXT_MUTED)
         }
         .alignItems(HorizontalAlign.Center)
       }
@@ -155,15 +182,34 @@ export struct PhoneHeroCard {
         .color(this.isEmergency() ? 'rgba(255,255,255,0.2)' : PhoneTheme.BORDER_LIGHT)
         .strokeWidth(1)
 
-      // One-line status
-      Text(heroSentence(this.riskIndex))
+      // Plain-English explanation
+      Text(heroSentence(this.vitals))
         .fontSize(PhoneTheme.FONT_BODY)
         .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
         .width('100%')
-        .maxLines(1)
+        .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-      // Actions (thumb-zone, emergency only)
+      // Driver detail chip
+      Row({ space: 6 }) {
+        Text(VitalsEngine.getPhenotypeLabel(this.vitals.phenotype))
+          .fontSize(PhoneTheme.FONT_MICRO)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.isEmergency() ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_MUTED)
+          .backgroundColor(this.isEmergency() ? 'rgba(255,255,255,0.16)' : PhoneTheme.BG_SUBTLE)
+          .borderRadius(PhoneTheme.PILL_RADIUS)
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+
+        Text(this.vitals.reasonSummary)
+          .fontSize(PhoneTheme.FONT_MICRO)
+          .fontColor(this.isEmergency() ? 'rgba(255,255,255,0.9)' : PhoneTheme.TEXT_MUTED)
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
       if (this.isEmergency()) {
         Row({ space: 10 }) {
           Button("I'm awake")
@@ -178,7 +224,7 @@ export struct PhoneHeroCard {
               this.onMarkWithThem();
             })
 
-          Button('Call now')
+          Button('Call caregiver')
             .fontSize(PhoneTheme.FONT_SUBTITLE)
             .fontWeight(FontWeight.Bold)
             .height(48)
@@ -194,7 +240,7 @@ export struct PhoneHeroCard {
         .width('100%')
         .margin({ top: 2 })
       } else if (this.isWarning()) {
-        Button('Check now')
+        Button('Check sleeper now')
           .fontSize(PhoneTheme.FONT_BODY)
           .fontWeight(FontWeight.Bold)
           .height(44)

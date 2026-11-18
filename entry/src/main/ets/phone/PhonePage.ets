@@ -1,15 +1,22 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Bedside Coordinator with 3 Clinical Navigation Tabs.
- * 1. Monitor (Bedside Guardian) • 2. History (Overnight Trajectory) • 3. Guardian (Settings & Dispatch).
+ * Phone Companion — Huawei Health Bedside Coordinator with 3 Navigation Tabs:
+ * 1. Monitor (Symptom Risk & Finger-Prick Check-In) • 2. History (Overnight Risk) • 3. Guardian (Profile, Gates & Alerts).
  */
 
+import {
+  BodyPhenotype,
+  DetectionPhase,
+  GateProgress,
+  VitalsData,
+  VitalsEngine
+} from '../models/VitalsModel';
+import { HistoryRepository } from '../models/HistoryModel';
 import { AlertService } from '../services/AlertService';
 import { DeviceConnectionManager, ConnectionState, ConnectionListener } from '../services/DeviceConnectionManager';
 import { formatLocalTime, formatLogTime } from '../common/utils/TimeUtils';
 import { AuditEntry } from './models/PhoneTypes';
-import { HistoryRepository } from '../models/HistoryModel';
-import { ppgSample, computeRiskIndex, riskLevel } from './utils/PhoneRiskUtils';
+import { ppgSample, riskLevel } from './utils/PhoneRiskUtils';
 import { PhoneTheme } from './utils/PhoneTheme';
 import { PhoneTopBar } from './components/PhoneTopBar';
 import { DemoSheet } from './components/DemoSheet';
@@ -21,12 +28,12 @@ import { FamilyView } from './views/FamilyView';
 export struct PhonePage {
   @State currentTabIndex: number = 0;
   @State currentTime: string = '00:00:00';
-  @State heartRate: number = 62;
-  @State variability: number = 42;
-  @State skinTemp: number = 36.0;
-  @State glucose: number = 5.5;
-  @State tremorPSD: number = 0.12;
-  @State riskIndex: number = 12;
+  @State phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
+  @State activePhase: DetectionPhase = 1;
+  @State gateProgress: GateProgress = HistoryRepository.getGateProgress();
+  @State vitals: VitalsData = VitalsEngine.createInitialVitals(BodyPhenotype.ADRENERGIC, 1, 3.7);
+  @State pendingPrickCheck: boolean = false;
+  @State historyVersion: number = 0;
   @State watchBattery: number = 86;
   @State isWatchConnected: boolean = true;
   @State deviceName: string = 'HUAWEI WATCH 4 Pro';
@@ -36,11 +43,9 @@ export struct PhonePage {
   @State caregiverPhone: string = '+63 917 123 4567';
   @State smnEnabled: boolean = true;
   @State smnLastSent: string = '';
-  @State bannerFlash: boolean = false;
   @State auditLog: AuditEntry[] = [
-    { time: '23:00', message: 'Night Guardian calibrated • Normal vitals', level: 'ok' },
-    { time: '02:15', message: 'Minor position shift • Normal', level: 'warn' },
-    { time: '02:16', message: 'Glucose stable at 5.5 mmol/L', level: 'ok' }
+    { time: '22:00', message: '75-min sleep baseline started', level: 'ok' },
+    { time: '23:15', message: 'Baseline ready — checking every 5 min', level: 'ok' }
   ];
 
   private alertService: AlertService = AlertService.getInstance();
@@ -49,7 +54,6 @@ export struct PhonePage {
   private tabsController: TabsController = new TabsController();
   private clockTimerId: number = -1;
   private streamTimerId: number = -1;
-  private flashTimerId: number = -1;
 
   private ppgSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private ppgContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.ppgSettings);
@@ -63,7 +67,6 @@ export struct PhonePage {
     for (let i: number = 0; i < this.PPG_LEN; i++) {
       this.ppgData.push(ppgSample(i / this.PPG_LEN));
     }
-    this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
 
     this.isWatchConnected = this.connManager.isConnected();
     this.deviceName = this.connManager.getState().deviceName;
@@ -73,9 +76,9 @@ export struct PhonePage {
       this.deviceName = state.deviceName;
       this.watchBattery = state.batteryLevel;
       if (!state.isConnected) {
-        this.logEvent('Watch disconnected — stream paused', 'warn');
+        this.logEvent('Phone link paused — watch monitors autonomously', 'warn');
       } else {
-        this.logEvent('Watch connected — live stream active', 'ok');
+        this.logEvent('Watch connected — live telemetry active', 'ok');
       }
     };
     this.connManager.addListener(this.connListener);
@@ -86,13 +89,9 @@ export struct PhonePage {
     this.streamTimerId = setInterval(() => {
       if (this.isWatchConnected) {
         this.pushPpgSamples();
-        this.jitterTelemetry();
         this.drawPPG();
       }
     }, 100);
-    this.flashTimerId = setInterval(() => {
-      this.bannerFlash = !this.bannerFlash;
-    }, 600);
   }
 
   aboutToDisappear(): void {
@@ -108,19 +107,25 @@ export struct PhonePage {
       clearInterval(this.streamTimerId);
       this.streamTimerId = -1;
     }
-    if (this.flashTimerId !== -1) {
-      clearInterval(this.flashTimerId);
-      this.flashTimerId = -1;
-    }
     this.alertService.stopEmergencyAlert();
   }
 
+  private getActiveThreshold(): number {
+    if (this.activePhase === 1) {
+      return VitalsEngine.PHASE1_THRESHOLD;
+    }
+    if (this.activePhase === 2) {
+      return this.gateProgress.hasPersonalLine ? this.gateProgress.personalLine : 5.44;
+    }
+    return 3.7;
+  }
+
   private isEmergency(): boolean {
-    return riskLevel(this.riskIndex) === 'Critical';
+    return riskLevel(this.vitals) === 'Critical';
   }
 
   private pushPpgSamples(): void {
-    const step: number = 0.045 + this.heartRate / 4000.0;
+    const step: number = 0.045 + this.vitals.pulse / 4000.0;
     for (let k: number = 0; k < 5; k++) {
       this.ppgPhase += step;
       if (this.ppgPhase >= 1.0) {
@@ -134,28 +139,6 @@ export struct PhonePage {
     }
   }
 
-  private jitterTelemetry(): void {
-    const lvl: string = riskLevel(this.riskIndex);
-    if (lvl === 'Critical') {
-      this.heartRate = 104 + Math.round((Math.random() - 0.5) * 6);
-      this.variability = 12 + Math.round(Math.random() * 6);
-      this.skinTemp = Math.round((34.7 + Math.random() * 0.3) * 10) / 10;
-    } else if (lvl === 'Warning') {
-      this.heartRate = 76 + Math.round((Math.random() - 0.5) * 5);
-      this.variability = 26 + Math.round(Math.random() * 6);
-      this.skinTemp = Math.round((35.5 + Math.random() * 0.2) * 10) / 10;
-    } else {
-      this.heartRate = 61 + Math.round((Math.random() - 0.5) * 3);
-      this.variability = 40 + Math.round(Math.random() * 8);
-      this.skinTemp = Math.round((35.9 + Math.random() * 0.2) * 10) / 10;
-    }
-    if (this.watchBattery > 20 && Math.random() < 0.01) {
-      this.watchBattery -= 1;
-      this.connManager.setBattery(this.watchBattery);
-    }
-    this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-  }
-
   private drawPPG(): void {
     if (!this.ppgReady) {
       return;
@@ -165,7 +148,7 @@ export struct PhonePage {
     const H: number = 56;
     ctx.clearRect(0, 0, W, H);
     ctx.beginPath();
-    ctx.strokeStyle = '#0284C7';
+    ctx.strokeStyle = this.isEmergency() ? '#EF4444' : '#0284C7';
     ctx.lineWidth = 2;
     const n: number = this.ppgData.length;
     for (let i: number = 0; i < n; i++) {
@@ -196,80 +179,175 @@ export struct PhonePage {
     }
   }
 
-  private simulateStable(): void {
+  private simulateBaseline(): void {
     this.alertService.stopEmergencyAlert();
-    this.glucose = 5.5;
-    this.tremorPSD = 0.12;
-    this.heartRate = 62;
-    this.skinTemp = 36.0;
-    this.variability = 42;
-    this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('Stable nocturnal vitals restored', 'ok');
+    this.vitals = VitalsEngine.generateBaselineVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      40
+    );
+    this.logEvent('75-min silent baseline warm-up previewed', 'info');
   }
 
-  private simulatePreDrop(): void {
+  private simulateSteady(): void {
     this.alertService.stopEmergencyAlert();
-    this.glucose = 4.2;
-    this.tremorPSD = 0.85;
-    this.heartRate = 78;
-    this.skinTemp = 35.6;
-    this.variability = 26;
-    this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('Glucose trending down (4.2 mmol/L)', 'warn');
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      75,
+      this.vitals.alertsTonight,
+      0
+    );
+    this.logEvent('Calm nocturnal vitals restored', 'ok');
   }
 
-  private simulateCrisis(): void {
-    this.glucose = 3.1;
-    this.tremorPSD = 1.84;
-    this.heartRate = 108;
-    this.skinTemp = 34.8;
-    this.variability = 12;
-    this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
+  private simulateStepCheck(): void {
+    this.vitals = VitalsEngine.generateElevatedStep(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      false
+    );
+    if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+      this.fireEmergencyAlert();
+    } else {
+      this.logEvent(`Elevated check ${this.vitals.streakCount}/${this.vitals.streakRequired} (waiting for repeat)`, 'warn');
+    }
+  }
+
+  private simulateSurge(): void {
+    this.vitals = VitalsEngine.generateElevatedStep(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      true
+    );
+    if (VitalsEngine.shouldTriggerAlert(this.vitals)) {
+      this.fireEmergencyAlert();
+    } else {
+      this.logEvent('Sustained surge blocked by 30m cooldown or max 2/night cap', 'warn');
+    }
+  }
+
+  private simulateMoving(): void {
+    this.alertService.stopEmergencyAlert();
+    this.vitals = VitalsEngine.generateMovingVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold()
+    );
+    this.logEvent('Motion detected — checks paused', 'info');
+  }
+
+  private fireEmergencyAlert(): void {
+    this.vitals.alertsTonight = Math.min(VitalsEngine.MAX_ALERTS_PER_NIGHT, this.vitals.alertsTonight + 1);
+    this.pendingPrickCheck = true;
     this.alertService.startEmergencyAlert();
-    this.logEvent('Emergency alert active • Alarm sounding', 'crit');
+    this.logEvent(`Symptom alert fired (${this.vitals.alertsTonight}/2 tonight)`, 'crit');
     if (this.smnEnabled) {
       const t: string = formatLogTime(new Date());
       this.smnLastSent = t;
-      this.logEvent(`SMS dispatched to ${this.caregiverName} (${this.caregiverPhone})`, 'crit');
-      HistoryRepository.updateTonightCrisis(this.glucose, this.riskIndex, this.caregiverName, this.caregiverPhone);
-    } else {
-      this.logEvent('SMS dispatch paused by user settings', 'warn');
+      this.logEvent(`Check-in SMS queued to ${this.caregiverName}`, 'crit');
+      HistoryRepository.updateTonightCrisis(
+        this.vitals.symptomRiskPct,
+        this.vitals.heuristicScore,
+        this.vitals.reasonSummary,
+        this.vitals.alertsTonight,
+        this.caregiverName,
+        this.caregiverPhone,
+        this.activePhase
+      );
+      this.historyVersion += 1;
     }
   }
 
   private markWithThem(): void {
     this.alertService.stopEmergencyAlert();
-    this.glucose = 4.6;
-    this.tremorPSD = 0.4;
-    this.riskIndex = computeRiskIndex(this.glucose, this.tremorPSD);
-    this.logEvent('Patient awake confirmed • Alarm silenced', 'ok');
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      75,
+      this.vitals.alertsTonight,
+      VitalsEngine.COOLDOWN_MINUTES
+    );
+    this.logEvent('Awake confirmed • 30-min cooldown active', 'ok');
     HistoryRepository.updateTonightResolved();
+    this.historyVersion += 1;
+  }
+
+  private handleLogFingerPrick(mgDl: number): void {
+    const updated: GateProgress = HistoryRepository.recordFingerPrick(mgDl, this.pendingPrickCheck);
+    this.gateProgress = updated;
+    this.pendingPrickCheck = false;
+    this.historyVersion += 1;
+    if (updated.isCnnUnlocked && this.activePhase < 3) {
+      this.activePhase = 3;
+      this.logEvent('Gate 2 passed — Phase 3 1D-CNN unlocked!', 'ok');
+    } else if (updated.hasPersonalLine && this.activePhase === 1) {
+      this.activePhase = 2;
+      this.logEvent(`Gate 1 passed — personal line ${updated.personalLine.toFixed(2)} ready`, 'ok');
+    } else {
+      this.logEvent(`Finger-prick logged: ${mgDl} mg/dL`, 'ok');
+    }
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      this.vitals.baselineMinutes,
+      this.vitals.alertsTonight,
+      this.vitals.cooldownMinutes
+    );
+  }
+
+  private handleSelectPhenotype(p: BodyPhenotype): void {
+    this.phenotype = p;
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      this.vitals.baselineMinutes,
+      this.vitals.alertsTonight,
+      this.vitals.cooldownMinutes
+    );
+  }
+
+  private handleSelectPhase(phase: DetectionPhase): void {
+    this.activePhase = phase;
+    this.vitals = VitalsEngine.generateSteadyVitals(
+      this.vitals,
+      this.phenotype,
+      this.activePhase,
+      this.getActiveThreshold(),
+      this.vitals.baselineMinutes,
+      this.vitals.alertsTonight,
+      this.vitals.cooldownMinutes
+    );
   }
 
   private handleCallNow(): void {
-    const lvl: string = riskLevel(this.riskIndex);
+    const lvl: string = riskLevel(this.vitals);
     if (lvl === 'Critical') {
-      this.logEvent(`Direct emergency dial to ${this.caregiverName}`, 'crit');
-      const tonight = HistoryRepository.getHistory()[0];
-      tonight.actionsTaken.unshift({
-        time: 'Just now',
-        type: 'call',
-        title: 'Emergency Phone Call Placed',
-        detail: `Direct phone dial to primary contact ${this.caregiverName}.`,
-        target: `${this.caregiverName} (${this.caregiverPhone})`,
-        status: 'Completed'
-      });
-    } else if (lvl === 'Warning') {
-      this.logEvent(`Alert check call to ${this.caregiverName}`, 'warn');
+      this.logEvent(`Emergency call placed to ${this.caregiverName}`, 'crit');
     } else {
-      this.logEvent(`Connected with ${this.caregiverName}`, 'info');
+      this.logEvent(`Checked in with ${this.caregiverName}`, 'info');
     }
   }
 
   private sendTestSmn(): void {
     const t: string = formatLogTime(new Date());
     this.smnLastSent = t;
-    this.logEvent(`Test SMS dispatch verified to ${this.caregiverPhone}`, 'ok');
+    this.logEvent(`Test SMS simulated for ${this.caregiverPhone}`, 'ok');
   }
 
   private switchToTab(index: number): void {
@@ -284,7 +362,7 @@ export struct PhonePage {
         Circle({ width: 6, height: 6 })
           .fill(PhoneTheme.BG_CARD)
 
-        Text(`${this.glucose.toFixed(1)} • Help alerted`)
+        Text(`${this.vitals.symptomRiskPct}% Risk • ${this.vitals.streakCount}/${this.vitals.streakRequired} checks`)
           .fontSize(PhoneTheme.FONT_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor(PhoneTheme.TEXT_ON_DARK)
@@ -322,7 +400,6 @@ export struct PhonePage {
           }
 
           if (index === 0) {
-            // Monitor Icon (Bedside Pulse)
             Row({ space: 2 }) {
               Row().width(3).height(8).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
               Row().width(3).height(14).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
@@ -330,7 +407,6 @@ export struct PhonePage {
             }
             .alignItems(VerticalAlign.Center)
           } else if (index === 1) {
-            // History Icon (Progression Bars)
             Row({ space: 2 }) {
               Row().width(3).height(6).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
               Row().width(3).height(10).backgroundColor(this.currentTabIndex === index ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_TERTIARY).borderRadius(1)
@@ -338,7 +414,6 @@ export struct PhonePage {
             }
             .alignItems(VerticalAlign.Bottom)
           } else {
-            // Guardian Icon (Shield)
             Stack({ alignContent: Alignment.Center }) {
               Row()
                 .width(12)
@@ -378,7 +453,6 @@ export struct PhonePage {
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
       Column() {
-        // Bedside Status Header
         PhoneTopBar({
           currentTime: this.currentTime,
           isEmergency: this.isEmergency(),
@@ -390,23 +464,17 @@ export struct PhonePage {
           }
         })
 
-        // Emergency banner across all screens if critical
         this.globalEmergencyBanner()
 
-        // 3 Primary Viewports
         Tabs({ barPosition: BarPosition.End, controller: this.tabsController }) {
-          // Tab 0: Monitor (Bedside Guardian)
           TabContent() {
             MonitorView({
-              glucose: this.glucose,
-              riskIndex: this.riskIndex,
+              vitals: this.vitals,
+              gateProgress: this.gateProgress,
               currentTime: this.currentTime,
-              heartRate: this.heartRate,
               watchBattery: this.watchBattery,
-              tremorPSD: this.tremorPSD,
-              skinTemp: this.skinTemp,
-              bannerFlash: this.bannerFlash,
               isWatchConnected: this.isWatchConnected,
+              pendingPrickCheck: this.pendingPrickCheck,
               caregiverName: this.caregiverName,
               caregiverPhone: this.caregiverPhone,
               ppgContext: this.ppgContext,
@@ -423,40 +491,46 @@ export struct PhonePage {
               onConnectWatch: () => {
                 this.connManager.setConnected(true);
               },
+              onLogFingerPrick: (mgDl: number) => {
+                this.handleLogFingerPrick(mgDl);
+              },
               onNavigateTab: (tabIndex: number) => {
                 this.switchToTab(tabIndex);
               }
             })
           }
 
-          // Tab 1: History (Overnight Trajectory)
           TabContent() {
             TrendsView({
-              glucose: this.glucose,
-              tremorPSD: this.tremorPSD,
-              riskIndex: this.riskIndex,
-              heartRate: this.heartRate,
-              currentTime: this.currentTime
+              vitals: this.vitals,
+              currentTime: this.currentTime,
+              historyVersion: this.historyVersion
             })
           }
 
-          // Tab 2: Guardian (Settings & SMN Dispatch)
           TabContent() {
             FamilyView({
               caregiverName: $caregiverName,
               caregiverPhone: $caregiverPhone,
               smnEnabled: $smnEnabled,
               smnLastSent: this.smnLastSent,
-              riskIndex: this.riskIndex,
-              glucose: this.glucose,
+              phenotype: this.phenotype,
+              activePhase: this.activePhase,
+              gateProgress: this.gateProgress,
               onCallNow: () => {
                 this.handleCallNow();
               },
               onToggleSmn: (isOn: boolean) => {
-                this.logEvent(isOn ? 'Family SMS dispatch enabled' : 'Family SMS dispatch paused', 'info');
+                this.logEvent(isOn ? 'Caregiver SMS alerts enabled' : 'Caregiver SMS alerts paused', 'info');
               },
               onSendTestSmn: () => {
                 this.sendTestSmn();
+              },
+              onSelectPhenotype: (p: BodyPhenotype) => {
+                this.handleSelectPhenotype(p);
+              },
+              onSelectPhase: (phase: DetectionPhase) => {
+                this.handleSelectPhase(phase);
               }
             })
           }
@@ -474,7 +548,6 @@ export struct PhonePage {
       .height('100%')
       .backgroundColor(PhoneTheme.BG_PAGE)
 
-      // Standard full-width bottom tab bar
       Column({ space: 0 }) {
         Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
         Row() {
@@ -492,7 +565,6 @@ export struct PhonePage {
       .width('100%')
       .backgroundColor(PhoneTheme.BG_CARD)
 
-      // Test Scenario Slide-up Overlay Sheet
       if (this.isTestSheetOpen) {
         Column() {
           Blank()
@@ -503,15 +575,33 @@ export struct PhonePage {
           DemoSheet({
             isWatchConnected: this.isWatchConnected,
             watchBattery: this.watchBattery,
-            deviceName: this.deviceName,
-            onSimulateStable: () => {
-              this.simulateStable();
+            phenotype: this.phenotype,
+            activePhase: this.activePhase,
+            onSimulateBaseline: () => {
+              this.simulateBaseline();
             },
-            onSimulatePreDrop: () => {
-              this.simulatePreDrop();
+            onSimulateSteady: () => {
+              this.simulateSteady();
             },
-            onSimulateCrisis: () => {
-              this.simulateCrisis();
+            onSimulateStepCheck: () => {
+              this.simulateStepCheck();
+            },
+            onSimulateSurge: () => {
+              this.simulateSurge();
+            },
+            onSimulateMoving: () => {
+              this.simulateMoving();
+            },
+            onTogglePhenotype: () => {
+              this.handleSelectPhenotype(
+                this.phenotype === BodyPhenotype.ADRENERGIC
+                  ? BodyPhenotype.BRADYCARDIC
+                  : BodyPhenotype.ADRENERGIC
+              );
+            },
+            onCyclePhase: () => {
+              const next: DetectionPhase = this.activePhase === 1 ? 2 : (this.activePhase === 2 ? 3 : 1);
+              this.handleSelectPhase(next);
             },
             onToggleWatchConnection: () => {
               this.connManager.toggleConnection();

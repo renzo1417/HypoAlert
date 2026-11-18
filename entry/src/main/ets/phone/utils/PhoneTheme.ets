@@ -49,7 +49,7 @@ export class PhoneTheme {
   static readonly STATE_CRIT_BG: string = '#FEF2F2';  // Red 50
 
   // --- Mobile-First Typography Scale (in fp / sp) ---
-  static readonly FONT_HERO: number = 32;             // Main glucose reading, single dominant number
+  static readonly FONT_HERO: number = 32;             // Main symptom risk reading, single dominant number
   static readonly FONT_TITLE: number = 18;            // Screen headers, quieter
   static readonly FONT_SECTION: number = 14;          // Card titles & section headers
   static readonly FONT_SUBTITLE: number = 13;         // Card subtitle / secondary text

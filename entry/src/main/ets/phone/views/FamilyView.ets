@@ -1,11 +1,9 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Screen 3: Guardian Settings & Emergency Dispatch.
- * Bedside monitoring schedule, adaptive baseline calibration, Huawei Cloud SMN dispatch, and caregiver contacts.
+ * Phone Companion — Screen 3: Profile Setup, Phase 1-3 Calibration Progress, and Caregiver Settings.
  */
 
-import { EmergencyContact, HistoryRepository } from '../../models/HistoryModel';
-import { riskLevel } from '../utils/PhoneRiskUtils';
+import { BodyPhenotype, DetectionPhase, GateProgress, VitalsEngine } from '../../models/VitalsModel';
 import { PhoneTheme } from '../utils/PhoneTheme';
 
 @Component
@@ -14,32 +12,35 @@ export struct FamilyView {
   @Link caregiverPhone: string;
   @Link smnEnabled: boolean;
   @Prop smnLastSent: string = '';
-  @Prop riskIndex: number = 12;
-  @Prop glucose: number = 5.5;
+  @Prop phenotype: BodyPhenotype = BodyPhenotype.ADRENERGIC;
+  @Prop activePhase: DetectionPhase = 1;
+  @Prop gateProgress: GateProgress = {
+    buzzLinkedPricks: 2,
+    confirmedLows: 0,
+    fineNights: 6,
+    personalLine: 3.7,
+    hasPersonalLine: false,
+    isCnnUnlocked: false,
+    isA2Personalized: false
+  };
+  @Prop ageYears: number = 26;
+  @Prop t1dYears: number = 8;
   @State guardianMasterEnabled: boolean = true;
-  @State adaptiveBaselineEnabled: boolean = true;
+  @State watchVibrationEnabled: boolean = true;
   @State scheduleStartTime: string = '22:00';
   @State scheduleEndTime: string = '06:00';
-  @State contactsList: EmergencyContact[] = [];
   onCallNow: () => void = () => {};
   onToggleSmn: (isOn: boolean) => void = () => {};
   onSendTestSmn: () => void = () => {};
-
-  aboutToAppear(): void {
-    this.contactsList = HistoryRepository.getContacts();
-  }
-
-  private isEmergency(): boolean {
-    return riskLevel(this.riskIndex) === 'Critical';
-  }
+  onSelectPhenotype: (p: BodyPhenotype) => void = () => {};
+  onSelectPhase: (phase: DetectionPhase) => void = () => {};
 
   build() {
     Scroll() {
       Column({ space: 12 }) {
-        // Header with context
         Column({ space: 2 }) {
           Row() {
-            Text('Guardian')
+            Text('Guardian & Profile')
               .fontSize(PhoneTheme.FONT_TITLE)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
@@ -55,7 +56,7 @@ export struct FamilyView {
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
-          Text('Night monitoring 22:00–06:00 • Alerts on')
+          Text('75m baseline • 30m cooldown • Max 2 alerts/night')
             .fontSize(PhoneTheme.FONT_CAPTION)
             .fontColor(PhoneTheme.TEXT_MUTED)
             .width('100%')
@@ -63,7 +64,170 @@ export struct FamilyView {
         .width('100%')
         .padding({ left: 2, right: 2, top: 2 })
 
-        // 1. Night watch window
+        // 1. One-Time Setup (Body Response Type)
+        Column({ space: 10 }) {
+          Row() {
+            Text('Your Body Response')
+              .fontSize(PhoneTheme.FONT_SECTION)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
+            Text(`Age ${this.ageYears} • T1D ${this.t1dYears}y`)
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontColor(PhoneTheme.TEXT_MUTED)
+          }
+          .width('100%')
+
+          Row({ space: 8 }) {
+            Button('Adrenergic (3 checks)')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontWeight(FontWeight.Bold)
+              .height(40)
+              .layoutWeight(1)
+              .backgroundColor(this.phenotype === BodyPhenotype.ADRENERGIC ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_SUBTLE)
+              .fontColor(this.phenotype === BodyPhenotype.ADRENERGIC ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onSelectPhenotype(BodyPhenotype.ADRENERGIC);
+              })
+
+            Button('Blunted (2 checks)')
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontWeight(FontWeight.Bold)
+              .height(40)
+              .layoutWeight(1)
+              .backgroundColor(this.phenotype === BodyPhenotype.BRADYCARDIC ? PhoneTheme.BRAND_PRIMARY : PhoneTheme.BG_SUBTLE)
+              .fontColor(this.phenotype === BodyPhenotype.BRADYCARDIC ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onSelectPhenotype(BodyPhenotype.BRADYCARDIC);
+              })
+          }
+          .width('100%')
+
+          Text(this.phenotype === BodyPhenotype.ADRENERGIC
+            ? 'Adrenergic: reacts with fast heart rate + shaking. Needs 3 high checks in a row (~15 min).'
+            : 'Blunted: quieter or flat pulse response. Needs 2 high checks in a row (~10 min).')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_MUTED)
+            .width('100%')
+        }
+        .width('100%')
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+
+        // 2. Phase 1 -> Phase 2 -> Phase 3 Learning Progress
+        Column({ space: 10 }) {
+          Row() {
+            Text('Learning Phases')
+              .fontSize(PhoneTheme.FONT_SECTION)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
+            Text(VitalsEngine.getPhaseName(this.activePhase))
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.BRAND_ACCENT)
+              .backgroundColor(PhoneTheme.BRAND_ACCENT_BG)
+              .borderRadius(PhoneTheme.PILL_RADIUS)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          }
+          .width('100%')
+
+          Row({ space: 6 }) {
+            Button('P1 Warm-Up')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .height(34)
+              .layoutWeight(1)
+              .backgroundColor(this.activePhase === 1 ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_SUBTLE)
+              .fontColor(this.activePhase === 1 ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onSelectPhase(1);
+              })
+
+            Button('P2 My Line')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .height(34)
+              .layoutWeight(1)
+              .backgroundColor(this.activePhase === 2 ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_SUBTLE)
+              .fontColor(this.activePhase === 2 ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onSelectPhase(2);
+              })
+
+            Button('P3 1D-CNN')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .height(34)
+              .layoutWeight(1)
+              .backgroundColor(this.activePhase === 3 ? PhoneTheme.BRAND_ACCENT : PhoneTheme.BG_SUBTLE)
+              .fontColor(this.activePhase === 3 ? PhoneTheme.TEXT_ON_DARK : PhoneTheme.TEXT_SECONDARY)
+              .borderRadius(PhoneTheme.TILE_RADIUS)
+              .onClick(() => {
+                this.onSelectPhase(3);
+              })
+          }
+          .width('100%')
+
+          Column({ space: 4 }) {
+            Row() {
+              Text('Gate 1: Personal cutoff (Phase 2)')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .layoutWeight(1)
+              Text(`${Math.min(3, this.gateProgress.buzzLinkedPricks)}/3 buzz pricks`)
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.gateProgress.hasPersonalLine ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_MUTED)
+            }
+            .width('100%')
+
+            Progress({ value: Math.min(3, this.gateProgress.buzzLinkedPricks), total: 3, type: ProgressType.Linear })
+              .width('100%')
+              .color(this.gateProgress.hasPersonalLine ? PhoneTheme.STATE_OK : PhoneTheme.BRAND_ACCENT)
+              .backgroundColor(PhoneTheme.BG_SUBTLE)
+          }
+          .width('100%')
+
+          Column({ space: 4 }) {
+            Row() {
+              Text('Gate 2: 60-min 1D-CNN (Phase 3)')
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontColor(PhoneTheme.TEXT_SECONDARY)
+                .layoutWeight(1)
+              Text(`${Math.min(1, this.gateProgress.confirmedLows)}/1 low • ${Math.min(10, this.gateProgress.fineNights)}/10 fine`)
+                .fontSize(PhoneTheme.FONT_CAPTION)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.gateProgress.isCnnUnlocked ? PhoneTheme.STATE_OK_TEXT : PhoneTheme.TEXT_MUTED)
+            }
+            .width('100%')
+
+            Progress({
+              value: Math.min(10, this.gateProgress.fineNights) + (this.gateProgress.confirmedLows > 0 ? 1 : 0),
+              total: 11,
+              type: ProgressType.Linear
+            })
+              .width('100%')
+              .color(this.gateProgress.isCnnUnlocked ? PhoneTheme.STATE_OK : PhoneTheme.BRAND_ACCENT)
+              .backgroundColor(PhoneTheme.BG_SUBTLE)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(PhoneTheme.CARD_PADDING)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
+
+        // 3. Night watch window & watch vibration
         Column({ space: 12 }) {
           Row() {
             Column({ space: 0 }) {
@@ -92,17 +256,17 @@ export struct FamilyView {
           Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
 
           Row() {
-            Text('Adaptive baseline')
+            Text('Watch wrist vibration')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
               .layoutWeight(1)
 
-            Toggle({ type: ToggleType.Switch, isOn: this.adaptiveBaselineEnabled })
+            Toggle({ type: ToggleType.Switch, isOn: this.watchVibrationEnabled })
               .selectedColor(PhoneTheme.BRAND_ACCENT)
               .width(42)
               .height(24)
               .onChange((isOn: boolean) => {
-                this.adaptiveBaselineEnabled = isOn;
+                this.watchVibrationEnabled = isOn;
               })
           }
           .width('100%')
@@ -115,10 +279,10 @@ export struct FamilyView {
         .borderColor(PhoneTheme.BORDER_SUBTLE)
         .borderRadius(PhoneTheme.CARD_RADIUS)
 
-        // 2. Alerts + contact
+        // 4. Caregiver & Alert Dispatch
         Column({ space: 12 }) {
           Row() {
-            Text('Alerts')
+            Text('Caregiver alerts (max 2/night)')
               .fontSize(PhoneTheme.FONT_SECTION)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
@@ -136,7 +300,6 @@ export struct FamilyView {
           .width('100%')
           .alignItems(VerticalAlign.Center)
 
-          // Contact row with initial + primary call
           Row({ space: 12 }) {
             Stack({ alignContent: Alignment.Center }) {
               Circle({ width: 40, height: 40 })
@@ -181,7 +344,6 @@ export struct FamilyView {
 
           Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
 
-          // Clear test action
           Row({ space: 10 }) {
             Button('Send test SMS')
               .fontSize(PhoneTheme.FONT_BODY)
@@ -201,7 +363,7 @@ export struct FamilyView {
           .alignItems(VerticalAlign.Center)
 
           if (this.smnLastSent.length > 0) {
-            Text(`Last sent ${this.smnLastSent}`)
+            Text(`Last test sent ${this.smnLastSent}`)
               .fontSize(PhoneTheme.FONT_CAPTION)
               .fontColor(PhoneTheme.TEXT_MUTED)
               .width('100%')

@@ -1,38 +1,39 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Phone Companion — Metric tile for tremor and nocturnal restlessness analysis.
+ * Phone Companion — Metric tile for 8-12 Hz wrist tremor and nocturnal stillness.
  */
 
 import { TremorBand } from '../../models/PhoneTypes';
-import { restlessShort, restlessHint, computeTremorBands } from '../../utils/PhoneRiskUtils';
+import { tremorLabel, tremorHint, computeTremorBands } from '../../utils/PhoneRiskUtils';
 
 @Component
 export struct RestlessTile {
-  @Prop tremorPSD: number = 0.12;
+  @Prop tremorTpi: number = 0.08;
+  @Prop isSedentary: boolean = true;
 
   build() {
     Column({ space: 6 }) {
-      Text('RESTLESSNESS')
+      Text('WRIST TREMOR')
         .fontSize(12)
         .fontWeight(FontWeight.Bold)
         .fontColor('#8A94A6')
         .width('100%')
 
-      Text(restlessShort(this.tremorPSD))
-        .fontSize(26)
+      Text(tremorLabel(this.tremorTpi, this.isSedentary))
+        .fontSize(24)
         .fontWeight(FontWeight.Bolder)
         .fontColor('#0F1B2D')
         .width('100%')
 
-      Text(restlessHint(this.tremorPSD))
-        .fontSize(14)
+      Text(tremorHint(this.tremorTpi, this.isSedentary))
+        .fontSize(13)
         .fontColor('#0F1B2D')
         .width('100%')
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
       Row({ space: 6 }) {
-        ForEach(computeTremorBands(this.tremorPSD), (band: TremorBand) => {
+        ForEach(computeTremorBands(this.tremorTpi), (band: TremorBand) => {
           Column({ space: 3 }) {
             Stack({ alignContent: Alignment.Bottom }) {
               Row()
@@ -60,7 +61,7 @@ export struct RestlessTile {
       .width('100%')
       .alignItems(VerticalAlign.Bottom)
 
-      Text(`Raw PSD ${this.tremorPSD.toFixed(2)} — sensor reading`)
+      Text(`8-12 Hz TPI ${this.tremorTpi.toFixed(2)} • ${this.isSedentary ? 'Still' : 'Paused'}`)
         .fontSize(11)
         .fontColor('#8A94A6')
         .width('100%')
@@ -83,7 +84,7 @@ export struct RestlessTile {
 struct RestlessTilePreview {
   build() {
     Row() {
-      RestlessTile({ tremorPSD: 0.85 })
+      RestlessTile({ tremorTpi: 0.19, isSedentary: true })
     }
     .width(180)
     .padding(8)

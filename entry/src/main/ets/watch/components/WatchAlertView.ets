@@ -1,25 +1,36 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Wearable — Screen 4: Critical emergency alert override with haptic and wake confirmation.
+ * Wearable — Screen 4: Symptom alert screen with plain-English triggers, SMS dispatch status, and wake confirmation.
  */
 
-import { VitalsData } from '../../models/VitalsModel';
+import { BodyPhenotype, VitalsData, VitalsEngine } from '../../models/VitalsModel';
 
 @Component
 export struct WatchAlertView {
-  @Prop vitals: VitalsData = {
-    pulse: 104,
-    skinTemp: 34.8,
-    tremorIndex: 8.5,
-    glucose: 3.1,
-    timestamp: '03:15'
-  };
+  @Prop vitals: VitalsData = VitalsEngine.generateElevatedStep(
+    undefined,
+    BodyPhenotype.ADRENERGIC,
+    1,
+    3.7,
+    true
+  );
   onDismiss: () => void = () => {};
+
+  private getAlertHeading(): string {
+    return this.vitals.phase < 3 ? 'POSSIBLE LOW' : 'SYMPTOM ALERT';
+  }
+
+  private getPlainSymptoms(): string {
+    if (this.vitals.phenotype === BodyPhenotype.ADRENERGIC) {
+      return 'Fast pulse & wrist tremor';
+    }
+    return 'HRV calmness drop & tremor';
+  }
 
   build() {
     Column() {
       Column({ space: 3 }) {
-        Text('CRITICAL ALERT')
+        Text(this.getAlertHeading())
           .fontSize(13)
           .fontWeight(FontWeight.Bolder)
           .fontColor('#FFFFFF')
@@ -28,14 +39,14 @@ export struct WatchAlertView {
           .textAlign(TextAlign.Center)
           .width('100%')
 
-        Text(`${this.vitals.glucose.toFixed(1)} mmol/L`)
+        Text(`${this.vitals.symptomRiskPct}% RISK`)
           .fontSize(20)
           .fontWeight(FontWeight.Bolder)
           .fontColor('#FFFFFF')
           .textAlign(TextAlign.Center)
           .width('100%')
 
-        Text('Hypoglycemia detected')
+        Text(this.getPlainSymptoms())
           .fontSize(9)
           .fontWeight(FontWeight.Bold)
           .fontColor('#FFE5E5')
@@ -44,12 +55,12 @@ export struct WatchAlertView {
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        // Emergency Dispatch Banner (Calls & Messages sent)
+        // Caregiver & Finger-Prick Reminder Box
         Column({ space: 2 }) {
           Row({ space: 3 }) {
             Text('📩')
               .fontSize(9)
-            Text('SMS: Maria (+63 917...)')
+            Text(`SMS: Maria (${this.vitals.alertsTonight}/2 tonight)`)
               .fontSize(8)
               .fontWeight(FontWeight.Bold)
               .fontColor('#FFFFFF')
@@ -60,9 +71,9 @@ export struct WatchAlertView {
           .alignItems(VerticalAlign.Center)
 
           Row({ space: 3 }) {
-            Text('📞')
+            Text('🩸')
               .fontSize(9)
-            Text('Calling Caregiver...')
+            Text('Check sugar & log on phone')
               .fontSize(8)
               .fontWeight(FontWeight.Bold)
               .fontColor('#FFFFFF')
@@ -78,8 +89,8 @@ export struct WatchAlertView {
         .borderRadius(6)
         .margin({ top: 2, bottom: 2 })
 
-        Text(`${this.vitals.pulse} BPM | ${this.vitals.skinTemp.toFixed(1)}°C`)
-          .fontSize(9)
+        Text(`${this.vitals.pulse} BPM | HRV ${this.vitals.rmssd}ms | ${this.vitals.streakCount}/${this.vitals.streakRequired}`)
+          .fontSize(8.5)
           .fontColor('#FFCDD2')
           .textAlign(TextAlign.Center)
           .width('100%')
@@ -99,7 +110,7 @@ export struct WatchAlertView {
             this.onDismiss();
           })
 
-        Text('Tap to stop alarms & sirens')
+        Text('Pauses 30m • Silences buzz')
           .fontSize(8)
           .fontColor('#FFCDD2')
           .textAlign(TextAlign.Center)
@@ -117,18 +128,12 @@ export struct WatchAlertView {
   }
 }
 
-@Preview({ title: 'Watch Critical Alert', width: 466, height: 466 })
+@Preview({ title: 'Watch Symptom Alert', width: 466, height: 466 })
 @Component
 struct WatchAlertViewPreview {
   build() {
     WatchAlertView({
-      vitals: {
-        pulse: 108,
-        skinTemp: 34.6,
-        tremorIndex: 8.8,
-        glucose: 2.9,
-        timestamp: '03:15'
-      }
+      vitals: VitalsEngine.generateElevatedStep(undefined, BodyPhenotype.ADRENERGIC, 1, 3.7, true)
     })
   }
 }

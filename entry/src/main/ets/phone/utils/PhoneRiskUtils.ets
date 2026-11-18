@@ -1,13 +1,14 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Mathematical risk modeling and telemetry evaluation functions for Phone Companion.
+ * Plain-language symptom telemetry and risk formatting helpers for Phone Companion.
  */
 
-import { TremorBand, OvernightPoint } from '../models/PhoneTypes';
+import { BodyPhenotype, DetectionPhase, VitalsData, VitalsEngine } from '../../models/VitalsModel';
+import { TremorBand } from '../models/PhoneTypes';
 import { PhoneTheme } from './PhoneTheme';
 
 /**
- * Computes a synthetic photoplethysmogram (PPG) pulse waveform sample with dicrotic notch.
+ * Computes a synthetic photoplethysmogram (PPG) pulse waveform sample for visual cardiac feedback.
  */
 export function ppgSample(phase: number): number {
   const sys: number = Math.exp(-Math.pow((phase - 0.18) / 0.07, 2));
@@ -16,236 +17,200 @@ export function ppgSample(phase: number): number {
   return sys + notch + drift;
 }
 
-/**
- * Calculates the combined hypoglycemia risk index (0 - 100) from glucose and autonomic tremor PSD.
- */
-export function computeRiskIndex(glucose: number, tremorPSD: number): number {
-  const gPart: number = (5.8 - glucose) * 28.0;
-  const tPart: number = tremorPSD * 22.0;
-  let r: number = Math.round(gPart + tPart);
-  if (r < 0) {
-    r = 0;
-  }
-  if (r > 100) {
-    r = 100;
-  }
-  return r;
-}
-
-export function riskLevel(risk: number): string {
-  if (risk > 70) {
+export function riskLevel(vitals: VitalsData): string {
+  if (vitals.statusTier === 'ALERT') {
     return 'Critical';
   }
-  if (risk >= 30) {
+  if (vitals.statusTier === 'WATCH' || vitals.symptomRiskPct >= 35) {
     return 'Warning';
   }
   return 'Normal';
 }
 
-export function riskColor(risk: number): string {
-  if (risk > 70) {
+export function riskColor(riskPct: number): string {
+  if (riskPct >= 70) {
     return PhoneTheme.STATE_CRIT;
   }
-  if (risk >= 30) {
+  if (riskPct >= 35) {
     return PhoneTheme.STATE_WARN;
   }
   return PhoneTheme.STATE_OK;
 }
 
-export function heroSentence(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return 'Needs help now';
+export function statusBadgeText(vitals: VitalsData): string {
+  if (vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+    return 'LEARNING';
   }
-  if (lvl === 'Warning') {
-    return 'Dropping — check on them';
+  if (!vitals.isSedentary) {
+    return 'PAUSED';
   }
-  return 'All steady';
+  if (vitals.statusTier === 'ALERT') {
+    return vitals.phase < 3 ? 'POSSIBLE LOW' : 'ALERT';
+  }
+  if (vitals.statusTier === 'WATCH') {
+    return 'WATCH';
+  }
+  if (vitals.cooldownMinutes > 0) {
+    return 'RESTING';
+  }
+  return 'STEADY';
 }
 
-export function trendWord(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return 'Dropping';
+export function heroSentence(vitals: VitalsData): string {
+  if (vitals.baselineMinutes < VitalsEngine.BASELINE_TOTAL_MINUTES) {
+    return `Silent 75-min sleep baseline (${vitals.baselineMinutes}/75 min) — no alerts yet`;
   }
-  if (lvl === 'Warning') {
-    return 'Drifting down';
+  if (!vitals.isSedentary) {
+    return 'Movement detected — checks pause while tossing or awake';
   }
-  return 'Steady';
+  if (vitals.statusTier === 'ALERT') {
+    return vitals.phase < 3
+      ? 'Possible nocturnal low — sustained symptom checks, please verify'
+      : '1D-CNN detected sustained low-sugar symptoms — check sleeper now';
+  }
+  if (vitals.statusTier === 'WATCH') {
+    return `${vitals.streakCount} of ${vitals.streakRequired} elevated checks — ignoring isolated spikes`;
+  }
+  if (vitals.cooldownMinutes > 0) {
+    return `30-min safety rest active (${vitals.cooldownMinutes} min left)`;
+  }
+  return 'All steady — pulse, heart calmness, and wrist stillness match tonight\'s sleep';
 }
 
-export function heartSub(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return 'Elevated — urgent';
+export function heartStatusLabel(vitals: VitalsData): string {
+  if (!vitals.isSedentary) {
+    return 'Awake / moving';
   }
-  if (lvl === 'Warning') {
-    return 'Slightly fast';
+  if (vitals.phenotype === BodyPhenotype.ADRENERGIC) {
+    if (vitals.deltaHr >= 18) {
+      return `+${vitals.deltaHr} bpm vs baseline`;
+    }
+    if (vitals.deltaHr >= 8) {
+      return `Slightly up (+${vitals.deltaHr})`;
+    }
+    return 'Resting normal';
   }
-  return 'Resting normal';
+  if (vitals.deltaHr <= -4) {
+    return 'Flat / slow response';
+  }
+  return 'Quiet resting pulse';
 }
 
-export function heartWords(riskIndex: number, heartRate: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return `Rapid pulse • ${heartRate} bpm`;
+export function hrvStatusLabel(rmssd: number): string {
+  if (rmssd <= 22) {
+    return 'Stressed — HRV dropped';
   }
-  if (lvl === 'Warning') {
-    return `Elevated pulse • ${heartRate} bpm`;
+  if (rmssd <= 32) {
+    return 'Slightly tense';
   }
-  return `Resting pulse • ${heartRate} bpm`;
+  return 'Calm & relaxed';
 }
 
-export function restlessShort(tremorPSD: number): string {
-  if (tremorPSD > 1.2) {
-    return 'Restless';
-  }
-  if (tremorPSD > 0.5) {
-    return 'Active';
-  }
-  return 'Calm';
-}
-
-export function restlessHint(tremorPSD: number): string {
-  if (tremorPSD > 1.2) {
-    return 'Frequent nocturnal movement';
-  }
-  if (tremorPSD > 0.5) {
-    return 'Minor position shifts';
-  }
-  return 'Restful, peaceful sleep';
-}
-
-export function tempStatus(skinTemp: number): string {
-  if (skinTemp < 35.2) {
-    return 'Cooling & clammy';
-  }
-  if (skinTemp < 35.8) {
-    return 'Slightly cool';
-  }
-  return 'Normal warmth';
-}
-
-export function tempColor(skinTemp: number): string {
-  if (skinTemp < 35.2) {
+export function hrvColor(rmssd: number): string {
+  if (rmssd <= 22) {
     return PhoneTheme.STATE_CRIT;
   }
-  if (skinTemp < 35.8) {
+  if (rmssd <= 32) {
     return PhoneTheme.STATE_WARN;
   }
   return PhoneTheme.STATE_OK;
 }
 
-export function computeTremorBands(tremorPSD: number): TremorBand[] {
+export function tremorLabel(tremorTpi: number, isSedentary: boolean): string {
+  if (!isSedentary) {
+    return 'Moving';
+  }
+  if (tremorTpi >= 0.17) {
+    return 'Tremor surge';
+  }
+  if (tremorTpi >= 0.13) {
+    return 'Mild tremor';
+  }
+  return 'Still & calm';
+}
+
+export function tremorHint(tremorTpi: number, isSedentary: boolean): string {
+  if (!isSedentary) {
+    return 'Motion gate paused checks';
+  }
+  if (tremorTpi >= 0.17) {
+    return 'Strong 8–12 Hz wrist tremor';
+  }
+  if (tremorTpi >= 0.13) {
+    return 'Light 8–12 Hz micro-tremor';
+  }
+  return 'Lying still — checking every 5m';
+}
+
+export function tremorColor(tremorTpi: number, isSedentary: boolean): string {
+  if (!isSedentary) {
+    return PhoneTheme.TEXT_TERTIARY;
+  }
+  if (tremorTpi >= 0.17) {
+    return PhoneTheme.STATE_CRIT;
+  }
+  if (tremorTpi >= 0.13) {
+    return PhoneTheme.STATE_WARN;
+  }
+  return PhoneTheme.STATE_OK;
+}
+
+export function computeTremorBands(tremorTpi: number): TremorBand[] {
   let b0: number = 0.25;
-  let b1: number = 0.2;
-  let b2: number = 0.1;
-  if (tremorPSD > 0.5 && tremorPSD <= 1.2) {
-    b0 = 0.3;
+  let b1: number = 0.18;
+  let b2: number = 0.10;
+  if (tremorTpi >= 0.13 && tremorTpi < 0.17) {
+    b0 = 0.28;
+    b1 = 0.50;
+    b2 = 0.48;
+  } else if (tremorTpi >= 0.17) {
+    b0 = 0.25;
     b1 = 0.55;
-    b2 = 0.45;
-  } else if (tremorPSD > 1.2) {
-    b0 = 0.3;
-    b1 = 0.6;
-    b2 = 0.95;
+    b2 = 0.94;
   }
   return [
-    { label: 'Calm', range: '0-4', power: b0, color: '#34C759' },
-    { label: 'Moving', range: '4-8', power: b1, color: '#FF9500' },
-    { label: 'Shaky', range: '8-12', power: b2, color: '#FF3B30' }
+    { label: 'Still', range: '0-4Hz', power: b0, color: PhoneTheme.STATE_OK },
+    { label: 'Roll', range: '4-8Hz', power: b1, color: PhoneTheme.STATE_WARN },
+    { label: 'Tremor', range: '8-12Hz', power: b2, color: PhoneTheme.STATE_CRIT }
   ];
 }
 
-export function riskShort(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return 'High';
-  }
-  if (lvl === 'Warning') {
-    return 'Watch';
-  }
-  return 'Low';
-}
-
-export function riskHint(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return 'Act now — help needed';
-  }
-  if (lvl === 'Warning') {
-    return 'Stay close tonight';
-  }
-  return 'No action needed';
-}
-
-export function riskWords(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return `Risk ${riskIndex}% — very high`;
-  }
-  if (lvl === 'Warning') {
-    return `Risk ${riskIndex}% — watch closely`;
-  }
-  return `Risk ${riskIndex}% — low`;
-}
-
-export function statusPillText(riskIndex: number): string {
-  const lvl: string = riskLevel(riskIndex);
-  if (lvl === 'Critical') {
-    return 'Emergency';
-  }
-  if (lvl === 'Warning') {
-    return 'Watch';
-  }
-  return 'Steady';
-}
-
-export function computeOvernightPoints(glucose: number): OvernightPoint[] {
-  const base: number[] = [5.6, 5.4, 5.0, 4.7, 5.1];
-  const hours: string[] = ['12am', '2am', '4am', '6am', '8am'];
-  const shift: number = (glucose - 5.2) * 0.45;
-  const pts: OvernightPoint[] = [];
-  for (let i: number = 0; i < base.length; i++) {
-    let v: number = base[i] + shift;
-    if (v < 2.8) {
-      v = 2.8;
-    }
-    if (v > 6.5) {
-      v = 6.5;
-    }
-    v = Math.round(v * 10) / 10;
-    pts.push({ hour: hours[i], value: v });
-  }
-  return pts;
-}
-
-export function getOvernightBarColor(v: number): string {
-  if (v < 3.9) {
+export function getOvernightBarColor(riskPct: number): string {
+  if (riskPct >= 70) {
     return PhoneTheme.STATE_CRIT;
   }
-  if (v < 4.4) {
+  if (riskPct >= 35) {
     return PhoneTheme.STATE_WARN;
   }
   return PhoneTheme.BRAND_ACCENT;
 }
 
-export function computeOvernightEvents(tremorPSD: number, riskIndex: number): string[] {
-  const lvl: string = riskLevel(riskIndex);
-  let checkMsg: string = 'Check-ins — quiet so far';
-  if (tremorPSD > 1.2 || lvl === 'Critical') {
-    checkMsg = 'Check-ins — restless, keep watching';
-  } else if (tremorPSD > 0.5 || lvl === 'Warning') {
-    checkMsg = 'Check-ins — some movement, all okay';
+export function riskShort(riskPct: number): string {
+  if (riskPct >= 70) {
+    return 'High';
   }
-  let alertMsg: string = 'Alerts — none tonight';
-  if (lvl === 'Critical') {
-    alertMsg = 'Alerts — 1 emergency tonight';
-  } else if (lvl === 'Warning') {
-    alertMsg = 'Alerts — 1 watch warning';
+  if (riskPct >= 35) {
+    return 'Watch';
   }
-  return [
-    'Bedtime 10:30pm — settled to sleep',
-    checkMsg,
-    alertMsg
-  ];
+  return 'Low';
+}
+
+export function riskHint(riskPct: number): string {
+  if (riskPct >= 70) {
+    return 'Check sleeper & log finger-prick';
+  }
+  if (riskPct >= 35) {
+    return 'Watching for repeat checks';
+  }
+  return 'Calm sleep — no action needed';
+}
+
+export function phaseBadgeLabel(phase: DetectionPhase, personalLine: number): string {
+  if (phase === 1) {
+    return 'Phase 1 • Fixed 3.7';
+  }
+  if (phase === 2) {
+    return `Phase 2 • My Line ${personalLine.toFixed(2)}`;
+  }
+  return 'Phase 3 • 60m 1D-CNN';
 }

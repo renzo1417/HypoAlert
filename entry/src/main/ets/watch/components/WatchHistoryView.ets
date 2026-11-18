@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2026 HypoAlert.
- * Wearable — Screen 2: 3-7 Day Nocturnal History and Action Logs for Huawei Watch.
- * Optimized for circular 466x466 screen with high-contrast legibility.
+ * Wearable — Screen 2: Past Nights peak symptom risk & finger-prick confirmation status.
  */
 
 import { NightHistoryRecord, HistoryRepository } from '../../models/HistoryModel';
@@ -17,10 +16,23 @@ export struct WatchHistoryView {
     this.historyRecords = HistoryRepository.getWatchHistory(5);
   }
 
+  private getShortVerdict(record: NightHistoryRecord): string {
+    if (record.fingerPrickVerdict === 'Confirmed Low') {
+      return `${record.dateShort} • Low ✓`;
+    }
+    if (record.fingerPrickVerdict === 'Fine Night') {
+      return `${record.dateShort} • Fine`;
+    }
+    if (record.fingerPrickVerdict === 'Pending Check') {
+      return `${record.dateShort} • Check?`;
+    }
+    return record.dateShort;
+  }
+
   build() {
     Scroll() {
       Column({ space: 0 }) {
-        Text('History')
+        Text('Past Nights')
           .fontSize(9)
           .fontWeight(FontWeight.Medium)
           .fontColor('#E8EBEF')
@@ -28,7 +40,7 @@ export struct WatchHistoryView {
           .width('100%')
           .maxLines(1)
 
-        Text('LOW mmol/L')
+        Text('PEAK SYMPTOM RISK')
           .fontSize(7)
           .fontColor('#5B616B')
           .textAlign(TextAlign.Center)
@@ -42,7 +54,7 @@ export struct WatchHistoryView {
               Circle({ width: 5, height: 5 })
                 .fill(record.status === 'CRITICAL' ? '#FF5252' : (record.status === 'WARNING' ? '#FFB74D' : '#00E676'))
 
-              Text(record.dateShort)
+              Text(this.getShortVerdict(record))
                 .fontSize(8)
                 .fontWeight(FontWeight.Normal)
                 .fontColor('#8A8F98')
@@ -50,10 +62,10 @@ export struct WatchHistoryView {
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-              Text(record.lowestGlucose.toFixed(1))
+              Text(`${record.peakRiskPct}%`)
                 .fontSize(12)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(record.lowestGlucose < 3.9 ? '#FF5252' : '#FFFFFF')
+                .fontColor(record.peakRiskPct >= 70 ? '#FF5252' : (record.peakRiskPct >= 35 ? '#FFB74D' : '#FFFFFF'))
                 .maxLines(1)
             }
             .width('100%')
