@@ -164,15 +164,8 @@ export struct PhonePage {
     const W: number = 320;
     const H: number = 56;
     ctx.clearRect(0, 0, W, H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 1;
-    const gy: number = H / 2;
     ctx.beginPath();
-    ctx.moveTo(0, gy);
-    ctx.lineTo(W, gy);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.strokeStyle = '#38BDF8';
+    ctx.strokeStyle = '#0284C7';
     ctx.lineWidth = 2;
     const n: number = this.ppgData.length;
     for (let i: number = 0; i < n; i++) {
@@ -288,44 +281,33 @@ export struct PhonePage {
   globalEmergencyBanner() {
     if (this.isEmergency()) {
       Row({ space: 10 }) {
-        Stack({ alignContent: Alignment.Center }) {
-          Circle({ width: 26, height: 26 })
-            .fill(PhoneTheme.BG_CARD)
-          Text('!')
-            .fontSize(14)
-            .fontWeight(FontWeight.Bolder)
-            .fontColor(PhoneTheme.STATE_CRIT)
-        }
-        .width(26)
-        .height(26)
+        Circle({ width: 6, height: 6 })
+          .fill(PhoneTheme.BG_CARD)
 
-        Column({ space: 1 }) {
-          Text('CRITICAL NOCTURNAL HYPOGLYCEMIA')
-            .fontSize(PhoneTheme.FONT_BODY)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(PhoneTheme.TEXT_ON_DARK)
-          Text('3.1 mmol/L • Wrist haptics & bedside siren active')
-            .fontSize(PhoneTheme.FONT_CAPTION)
-            .fontColor(PhoneTheme.TEXT_ON_DARK)
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
+        Text(`${this.glucose.toFixed(1)} • Help alerted`)
+          .fontSize(PhoneTheme.FONT_BODY)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(PhoneTheme.TEXT_ON_DARK)
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        Button("I'm Awake")
+        Button("I'm awake")
           .fontSize(PhoneTheme.FONT_CAPTION)
           .fontWeight(FontWeight.Bold)
-          .height(30)
+          .height(32)
+          .padding({ left: 12, right: 12 })
           .backgroundColor(PhoneTheme.BG_CARD)
           .fontColor(PhoneTheme.STATE_CRIT)
-          .borderRadius(PhoneTheme.TILE_RADIUS)
+          .borderRadius(PhoneTheme.PILL_RADIUS)
           .onClick(() => {
             this.markWithThem();
           })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 7, bottom: 7 })
+      .height(44)
+      .padding({ left: 16, right: 12 })
       .backgroundColor(PhoneTheme.STATE_CRIT)
-      .opacity(this.bannerFlash ? 1.0 : 0.9)
     }
   }
 
@@ -492,23 +474,23 @@ export struct PhonePage {
       .height('100%')
       .backgroundColor(PhoneTheme.BG_PAGE)
 
-      // Floating 3-Tab Navigation Bar
-      Row() {
-        this.floatingTabButton(0, 'Monitor')
-        this.floatingTabButton(1, 'History')
-        this.floatingTabButton(2, 'Guardian')
+      // Standard full-width bottom tab bar
+      Column({ space: 0 }) {
+        Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
+        Row() {
+          this.floatingTabButton(0, 'Monitor')
+          this.floatingTabButton(1, 'History')
+          this.floatingTabButton(2, 'Guardian')
+        }
+        .width('100%')
+        .height(64)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .padding({ left: 12, right: 12, bottom: 8 })
+        .justifyContent(FlexAlign.SpaceAround)
+        .alignItems(VerticalAlign.Center)
       }
-      .width('76%')
-      .height(56)
+      .width('100%')
       .backgroundColor(PhoneTheme.BG_CARD)
-      .borderRadius(28)
-      .borderWidth(1)
-      .borderColor(PhoneTheme.BORDER_SUBTLE)
-      .shadow({ radius: 12, color: 'rgba(15, 23, 42, 0.08)', offsetY: 3 })
-      .margin({ bottom: 16 })
-      .padding({ left: 10, right: 10 })
-      .justifyContent(FlexAlign.SpaceAround)
-      .alignItems(VerticalAlign.Center)
 
       // Test Scenario Slide-up Overlay Sheet
       if (this.isTestSheetOpen) {

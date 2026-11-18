@@ -30,30 +30,26 @@ export struct MonitorView {
 
   build() {
     Scroll() {
-      Column({ space: 14 }) {
-        // Watch offline reminder banner (only visible when BLE disconnected)
+      Column({ space: 12 }) {
+        // Watch offline reminder (single line)
         if (!this.isWatchConnected) {
           Row({ space: 10 }) {
-            Circle({ width: 7, height: 7 })
+            Circle({ width: 6, height: 6 })
               .fill(PhoneTheme.STATE_WARN)
 
-            Column({ space: 1 }) {
-              Text('Watch Disconnected')
-                .fontSize(PhoneTheme.FONT_SUBTITLE)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_PRIMARY)
-              Text('Link watch stream to resume nocturnal monitoring')
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_MUTED)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
+            Text('Watch offline — reconnect to resume')
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
 
             Button('Connect')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontWeight(FontWeight.Bold)
-              .height(30)
-              .padding({ left: 12, right: 12 })
+              .height(40)
+              .padding({ left: 14, right: 14 })
               .backgroundColor(PhoneTheme.BRAND_PRIMARY)
               .fontColor(PhoneTheme.TEXT_ON_DARK)
               .borderRadius(PhoneTheme.TILE_RADIUS)
@@ -70,7 +66,22 @@ export struct MonitorView {
           .alignItems(VerticalAlign.Center)
         }
 
-        // Primary Hero Card: Glycemic state, Risk gauge, and crisis actions
+        // Section: Tonight
+        Row() {
+          Text('Tonight')
+            .fontSize(PhoneTheme.FONT_SECTION)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(PhoneTheme.TEXT_PRIMARY)
+            .layoutWeight(1)
+          Text('22:00–06:00')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_MUTED)
+        }
+        .width('100%')
+        .padding({ left: 2, right: 2 })
+        .alignItems(VerticalAlign.Center)
+
+        // Primary hero: single dominant reading
         PhoneHeroCard({
           glucose: this.glucose,
           riskIndex: this.riskIndex,
@@ -83,7 +94,24 @@ export struct MonitorView {
           onMarkWithThem: this.onMarkWithThem
         })
 
-        // Core Sympathetic Biomarkers (Tremor, Pulse, Temp, Baseline)
+        // Section: Vitals
+        Row() {
+          Text('Vitals')
+            .fontSize(PhoneTheme.FONT_SECTION)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(PhoneTheme.TEXT_PRIMARY)
+            .layoutWeight(1)
+          Circle({ width: 6, height: 6 })
+            .fill(this.isWatchConnected ? PhoneTheme.STATE_OK : PhoneTheme.TEXT_TERTIARY)
+          Text(this.isWatchConnected ? 'Live' : 'Paused')
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_MUTED)
+        }
+        .width('100%')
+        .padding({ left: 2, right: 2 })
+        .alignItems(VerticalAlign.Center)
+
+        // Quiet secondary vitals
         PhoneMetricGrid({
           heartRate: this.heartRate,
           tremorPSD: this.tremorPSD,
@@ -93,20 +121,57 @@ export struct MonitorView {
           onCanvasReady: this.onCanvasReady
         })
 
-        // Calming Bedside Safeguard Footer Notice
-        Row({ space: 6 }) {
-          Circle({ width: 4, height: 4 }).fill(PhoneTheme.TEXT_TERTIARY)
-          Text('Bedside Guardian: Haptic wrist alert sounds loud phone siren if unawakened')
-            .fontSize(PhoneTheme.FONT_MICRO)
-            .fontColor(PhoneTheme.TEXT_TERTIARY)
-            .layoutWeight(1)
+        // Section: Caregiver — always visible call path
+        Row({ space: 12 }) {
+          Stack({ alignContent: Alignment.Center }) {
+            Circle({ width: 40, height: 40 })
+              .fill(PhoneTheme.BRAND_PRIMARY)
+            Text(this.caregiverName.length > 0 ? this.caregiverName.substring(0, 1) : 'M')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_ON_DARK)
+          }
+          .width(40)
+          .height(40)
+          Column({ space: 0 }) {
+            Text('Caregiver')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_TERTIARY)
+            Text(this.caregiverName)
+              .fontSize(PhoneTheme.FONT_BODY)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text(this.caregiverPhone)
+              .fontSize(PhoneTheme.FONT_CAPTION)
+              .fontColor(PhoneTheme.TEXT_MUTED)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+          Button('Call')
+            .fontSize(PhoneTheme.FONT_BODY)
+            .fontWeight(FontWeight.Bold)
+            .height(48)
+            .padding({ left: 18, right: 18 })
+            .backgroundColor(PhoneTheme.BRAND_PRIMARY)
+            .fontColor(PhoneTheme.TEXT_ON_DARK)
+            .borderRadius(PhoneTheme.TILE_RADIUS)
+            .onClick(() => {
+              this.onCallNow();
+            })
         }
         .width('100%')
-        .padding({ left: 4, right: 4, top: 4, bottom: 20 })
+        .padding(12)
+        .backgroundColor(PhoneTheme.BG_CARD)
+        .borderWidth(1)
+        .borderColor(PhoneTheme.BORDER_SUBTLE)
+        .borderRadius(PhoneTheme.CARD_RADIUS)
         .alignItems(VerticalAlign.Center)
       }
       .width('100%')
-      .padding({ left: 18, right: 18, top: 6, bottom: 36 })
+      .padding({ left: 16, right: 16, top: 8, bottom: 88 })
     }
     .width('100%')
     .height('100%')

@@ -79,29 +79,26 @@ export struct TrendsView {
 
   build() {
     Scroll() {
-      Column({ space: 14 }) {
-        // Screen Header
-        Row() {
-          Column({ space: 1 }) {
-            Text('Overnight Trajectory')
+      Column({ space: 12 }) {
+        // Screen header with tonight summary
+        Column({ space: 2 }) {
+          Row() {
+            Text('Overnight')
               .fontSize(PhoneTheme.FONT_TITLE)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
-            Text('Nocturnal stability and clinical alert logs')
+              .layoutWeight(1)
+
+            Text('12am–8am')
               .fontSize(PhoneTheme.FONT_CAPTION)
               .fontColor(PhoneTheme.TEXT_MUTED)
           }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-
-          // 7-day pill
-          Text('7-Day History')
-            .fontSize(PhoneTheme.FONT_MICRO)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(PhoneTheme.BRAND_ACCENT)
-            .backgroundColor(PhoneTheme.BRAND_ACCENT_BG)
-            .borderRadius(PhoneTheme.PILL_RADIUS)
-            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          Text(`Low ${this.getSelectedRecord().lowestGlucose.toFixed(1)} • Target ≥3.9 mmol/L`)
+            .fontSize(PhoneTheme.FONT_CAPTION)
+            .fontColor(PhoneTheme.TEXT_MUTED)
+            .width('100%')
         }
         .width('100%')
         .padding({ left: 2, right: 2, top: 2 })
@@ -139,22 +136,16 @@ export struct TrendsView {
         .scrollBar(BarState.Off)
         .width('100%')
 
-        // Selected Night Glycemic Summary Card
+        // Selected night summary (two numbers only)
         Column({ space: 12 }) {
           Row() {
-            Column({ space: 1 }) {
-              Text(this.getSelectedRecord().dateLabel)
-                .fontSize(PhoneTheme.FONT_SECTION)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(PhoneTheme.TEXT_PRIMARY)
-              Text(`${this.getSelectedRecord().durationHours}h continuous monitoring`)
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontColor(PhoneTheme.TEXT_MUTED)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
+            Text(this.getSelectedRecord().dateLabel)
+              .fontSize(PhoneTheme.FONT_SECTION)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_PRIMARY)
+              .layoutWeight(1)
 
-            Text(this.getSelectedRecord().status === 'CRITICAL' ? 'CRITICAL' : (this.getSelectedRecord().status === 'WARNING' ? 'WARNING' : 'ALL CLEAR'))
+            Text(this.getSelectedRecord().status === 'CRITICAL' ? 'URGENT' : (this.getSelectedRecord().status === 'WARNING' ? 'WATCH' : 'STEADY'))
               .fontSize(PhoneTheme.FONT_MICRO)
               .fontWeight(FontWeight.Bold)
               .fontColor(this.getStatusText(this.getSelectedRecord().status))
@@ -167,11 +158,11 @@ export struct TrendsView {
 
           Divider().color(PhoneTheme.BORDER_LIGHT).strokeWidth(1)
 
-          // 2 Core Health Metrics Strip: Min Glucose & Time in Safe Range
+          // Low + in-range strip
           Row() {
-            // Lowest Glucose
+            // Lowest
             Column({ space: 2 }) {
-              Text('MIN GLUCOSE')
+              Text('LOW')
                 .fontSize(PhoneTheme.FONT_MICRO)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(PhoneTheme.TEXT_TERTIARY)
@@ -187,20 +178,15 @@ export struct TrendsView {
                   .margin({ bottom: 2 })
               }
               .alignItems(VerticalAlign.Bottom)
-
-              Text(this.getSelectedRecord().lowestGlucose < 3.9 ? 'Danger drop' : (this.getSelectedRecord().lowestGlucose < 4.4 ? 'Pre-drop dip' : 'Safe range'))
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(this.getSelectedRecord().lowestGlucose < 3.9 ? PhoneTheme.STATE_CRIT : (this.getSelectedRecord().lowestGlucose < 4.4 ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT))
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Center)
 
-            Divider().vertical(true).height(36).color(PhoneTheme.BORDER_LIGHT)
+            Divider().vertical(true).height(32).color(PhoneTheme.BORDER_LIGHT)
 
-            // Time In Safe Range
+            // In range
             Column({ space: 2 }) {
-              Text('TIME IN SAFE RANGE')
+              Text('IN RANGE')
                 .fontSize(PhoneTheme.FONT_MICRO)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(PhoneTheme.TEXT_TERTIARY)
@@ -209,11 +195,6 @@ export struct TrendsView {
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(PhoneTheme.TEXT_PRIMARY)
-
-              Text('Threshold ≥ 3.9')
-                .fontSize(PhoneTheme.FONT_CAPTION)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(PhoneTheme.STATE_OK_TEXT)
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Center)
@@ -228,35 +209,26 @@ export struct TrendsView {
         .borderRadius(PhoneTheme.CARD_RADIUS)
         .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
 
-        // Overnight Progression Chart (12am – 8am)
+        // Overnight bars (12am – 8am)
         Column({ space: 10 }) {
           Row() {
-            Text('Glycemic Progression (12am – 8am)')
+            Text('Glucose 12am–8am')
               .fontSize(PhoneTheme.FONT_SECTION)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
-
             Blank()
-
-            Row({ space: 6 }) {
-              Row({ space: 3 }) {
-                Circle({ width: 5, height: 5 }).fill(PhoneTheme.BRAND_ACCENT)
-                Text('Safe').fontSize(PhoneTheme.FONT_MICRO).fontColor(PhoneTheme.TEXT_MUTED)
-              }
-              Row({ space: 3 }) {
-                Circle({ width: 5, height: 5 }).fill(PhoneTheme.STATE_WARN)
-                Text('Dip').fontSize(PhoneTheme.FONT_MICRO).fontColor(PhoneTheme.TEXT_MUTED)
-              }
-              Row({ space: 3 }) {
-                Circle({ width: 5, height: 5 }).fill(PhoneTheme.STATE_CRIT)
-                Text('Hypo').fontSize(PhoneTheme.FONT_MICRO).fontColor(PhoneTheme.TEXT_MUTED)
-              }
-            }
+            Text('Target ≥3.9')
+              .fontSize(PhoneTheme.FONT_MICRO)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(PhoneTheme.TEXT_MUTED)
+              .backgroundColor(PhoneTheme.BG_SUBTLE)
+              .borderRadius(PhoneTheme.PILL_RADIUS)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
 
-          // 5-bar visualization with values
+          // 5-bar visualization, all values shown
           Row({ space: 10 }) {
             ForEach(this.getSelectedRecord().hourlyPoints, (val: number, idx: number) => {
               Column({ space: 4 }) {
@@ -264,25 +236,26 @@ export struct TrendsView {
                   .fontSize(PhoneTheme.FONT_CAPTION)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(val < 3.9 ? PhoneTheme.STATE_CRIT : PhoneTheme.TEXT_PRIMARY)
+                  .height(14)
+                  .maxLines(1)
 
                 Stack({ alignContent: Alignment.Bottom }) {
                   Row()
                     .width('100%')
-                    .height(80)
-                    .backgroundColor(PhoneTheme.BG_MUTED)
+                    .height(96)
+                    .backgroundColor(PhoneTheme.BG_SUBTLE)
                     .borderRadius(6)
                   Row()
                     .width('100%')
-                    .height(Math.round((val / 6.5) * 80))
+                    .height(Math.round((val / 6.5) * 96))
                     .backgroundColor(getOvernightBarColor(val))
                     .borderRadius(6)
                 }
                 .width('100%')
-                .height(80)
+                .height(96)
 
                 Text(idx === 0 ? '12am' : (idx === 1 ? '2am' : (idx === 2 ? '4am' : (idx === 3 ? '6am' : '8am'))))
                   .fontSize(PhoneTheme.FONT_MICRO)
-                  .fontWeight(FontWeight.Medium)
                   .fontColor(PhoneTheme.TEXT_MUTED)
               }
               .layoutWeight(1)
@@ -291,16 +264,6 @@ export struct TrendsView {
           }
           .width('100%')
           .alignItems(VerticalAlign.Bottom)
-
-          // Hypoglycemia Danger Line reference
-          Row({ space: 5 }) {
-            Circle({ width: 4, height: 4 }).fill(PhoneTheme.STATE_CRIT)
-            Text('Red threshold: < 3.9 mmol/L activates wrist haptics and bedside alarm')
-              .fontSize(PhoneTheme.FONT_MICRO)
-              .fontColor(PhoneTheme.TEXT_MUTED)
-              .layoutWeight(1)
-          }
-          .width('100%')
         }
         .width('100%')
         .padding(PhoneTheme.CARD_PADDING)
@@ -310,28 +273,28 @@ export struct TrendsView {
         .borderRadius(PhoneTheme.CARD_RADIUS)
         .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
 
-        // Incident & Dispatch Trail
+        // Events tonight
         Column({ space: 10 }) {
           Row() {
-            Text('Incident & Dispatch Trail')
+            Text('Events tonight')
               .fontSize(PhoneTheme.FONT_SECTION)
               .fontWeight(FontWeight.Bold)
               .fontColor(PhoneTheme.TEXT_PRIMARY)
 
             Blank()
 
-            Text(`${this.getSelectedRecord().actionsTaken.length} Event(s)`)
+            Text(this.getSelectedRecord().actionsTaken.length === 0 ? 'None' : `${this.getSelectedRecord().actionsTaken.length}`)
               .fontSize(PhoneTheme.FONT_MICRO)
               .fontWeight(FontWeight.Bold)
               .fontColor(this.getSelectedRecord().actionsTaken.length > 0 ? PhoneTheme.STATE_WARN_TEXT : PhoneTheme.STATE_OK_TEXT)
               .backgroundColor(this.getSelectedRecord().actionsTaken.length > 0 ? PhoneTheme.STATE_WARN_BG : PhoneTheme.STATE_OK_BG)
               .borderRadius(PhoneTheme.PILL_RADIUS)
-              .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           }
           .width('100%')
 
           if (this.getSelectedRecord().actionsTaken.length === 0) {
-            Text('No emergency interventions required tonight. Normal sleep.')
+            Text('Quiet night — no alerts needed.')
               .fontSize(PhoneTheme.FONT_BODY)
               .fontColor(PhoneTheme.TEXT_MUTED)
               .padding(8)
@@ -350,6 +313,8 @@ export struct TrendsView {
                         .fontWeight(FontWeight.Bold)
                         .fontColor(PhoneTheme.TEXT_PRIMARY)
                         .layoutWeight(1)
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
 
                       Text(action.time)
                         .fontSize(PhoneTheme.FONT_MICRO)
@@ -361,12 +326,8 @@ export struct TrendsView {
                       .fontSize(PhoneTheme.FONT_CAPTION)
                       .fontColor(PhoneTheme.TEXT_MUTED)
                       .width('100%')
-
-                    if (action.target) {
-                      Text(`Target: ${action.target}`)
-                        .fontSize(PhoneTheme.FONT_MICRO)
-                        .fontColor(PhoneTheme.TEXT_SECONDARY)
-                    }
+                      .maxLines(2)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .layoutWeight(1)
                   .alignItems(HorizontalAlign.Start)
@@ -390,7 +351,7 @@ export struct TrendsView {
         .shadow({ radius: 8, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
       }
       .width('100%')
-      .padding({ left: 18, right: 18, top: 6, bottom: 36 })
+      .padding({ left: 16, right: 16, top: 8, bottom: 88 })
     }
     .width('100%')
     .height('100%')

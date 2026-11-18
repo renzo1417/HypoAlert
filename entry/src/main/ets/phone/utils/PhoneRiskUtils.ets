@@ -55,23 +55,23 @@ export function riskColor(risk: number): string {
 export function heroSentence(riskIndex: number): string {
   const lvl: string = riskLevel(riskIndex);
   if (lvl === 'Critical') {
-    return 'Critical emergency — urgent help alerted';
+    return 'Needs help now';
   }
   if (lvl === 'Warning') {
-    return 'Glucose dropping — check on them';
+    return 'Dropping — check on them';
   }
-  return 'All vitals steady throughout the night';
+  return 'All steady';
 }
 
 export function trendWord(riskIndex: number): string {
   const lvl: string = riskLevel(riskIndex);
   if (lvl === 'Critical') {
-    return 'Dropping fast';
+    return 'Dropping';
   }
   if (lvl === 'Warning') {
-    return 'Trending down';
+    return 'Drifting down';
   }
-  return 'Stable';
+  return 'Steady';
 }
 
 export function heartSub(riskIndex: number): string {
